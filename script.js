@@ -139,12 +139,36 @@ function generateReferralCode(name) {
     return `${prefix}${rand}`;
 }
 
+async function refreshUsersDatabase() {
+    try {
+        const response = await fetch(`${API_URL}/api/users`);
+        if (response.ok) {
+            const dbUsers = await response.json();
+            // Reinsert the hardcoded admin so admin login logic doesn't crash elsewhere
+            const admin = { name: "Admin Manager", email: "admin@college.edu", usn: "admin", pwd: "admin", role: "admin", points: 0, referralCode: "ADMIN", refUsed: null };
+            usersDB = [admin, ...dbUsers];
+            
+            // Instantly refresh UI elements that depend on usersDB
+            if (currentUser && currentUser.role === 'student') renderLeaderboard();
+            if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
+        }
+    } catch(err) {
+        console.error("Could not pull leaderboard data", err);
+    }
+}
+
 function loginUser(user) {
     currentUser = user;
     document.getElementById('authSection').classList.remove('active');
     document.getElementById('mainApp').style.display = 'block';
-    setupEnvironment();
+    
+    // Automatically force the leaderboard to fetch MongoDB list before rendering
+    refreshUsersDatabase().then(() => {
+        setupEnvironment();
+    });
+    
     document.getElementById('loginForm').reset();
+    document.getElementById('signupForm').reset(); // Always cleanly reset signup forms
 }
 
 function logout() {

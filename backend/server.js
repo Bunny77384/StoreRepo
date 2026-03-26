@@ -46,6 +46,16 @@ let products = [
 
 app.get('/api/products', (req, res) => res.json(products));
 
+// Fetch all registered users for the frontend Leaderboard logic
+app.get('/api/users', async (req, res) => {
+    try {
+        const users = await User.find({}, '-pwd'); // Get everyone without passwords
+        res.json(users);
+    } catch(err) {
+        res.status(500).json({ error: "Failed to fetch users" });
+    }
+});
+
 // Authentication Routes
 app.post('/api/signup', async (req, res) => {
     try {
