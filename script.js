@@ -72,35 +72,21 @@ function switchAuthTab(tab) {
     }
 }
 
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:5000'
-    : 'https://store-api-backend-cic4.onrender.com'; // Change this if your Render URL changes!
-
-async function handleLogin(e) {
+function handleLogin(e) {
     e.preventDefault();
     const loginId = document.getElementById('loginId').value.trim();
     const loginPwd = document.getElementById('loginPwd').value;
 
-    try {
-        const response = await fetch(`${API_URL}/api/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ loginId, pwd: loginPwd })
-        });
+    const user = usersDB.find(u => (u.email === loginId || u.usn === loginId) && u.pwd === loginPwd);
 
-        const data = await response.json();
-        if (response.ok) {
-            showToast(data.message, "success");
-            loginUser(data.user);
-        } else {
-            showToast(data.error, "error");
-        }
-    } catch (err) {
-        showToast("Backend API goes offline or is sleeping!", "error");
+    if (user) {
+        loginUser(user);
+    } else {
+        showToast("Invalid credentials! Check your Email/USN and Password.", "error");
     }
 }
 
-async function handleSignup(e) {
+function handleSignup(e) {
     e.preventDefault();
     const name = document.getElementById('regName').value.trim();
     const email = document.getElementById('regEmail').value.trim();
@@ -113,24 +99,31 @@ async function handleSignup(e) {
     if (!emailRegex.test(email)) {
         showToast("Please use a valid email address.", "error"); return;
     }
-
-    try {
-        const response = await fetch(`${API_URL}/api/signup`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, email, usn, pwd, refCode })
-        });
-
-        const data = await response.json();
-        if (response.ok) {
-            showToast(data.message, "success");
-            loginUser(data.user);
-        } else {
-            showToast(data.error, "error");
-        }
-    } catch (err) {
-        showToast("Cannot speak to the Backend!", "error");
+    if (usersDB.some(u => u.email === email || u.usn === usn)) {
+        showToast("USN or Email already registered!", "error"); return;
     }
+
+    let initialPoints = 50;
+    let referrer = null;
+    if (refCode) {
+        referrer = usersDB.find(u => u.referralCode === refCode);
+        if (referrer && referrer.email !== email) { // Prevent self if somehow exists
+            initialPoints += 25; // User gets extra 25 for using code
+            referrer.points += 50; // Referrer gets 50
+            pushSystemNotification(referrer.email, "Referral Bonus!", `Someone signed up using your code. You earned 50 pts!`);
+        } else {
+            showToast("Invalid referral code.", "error"); return;
+        }
+    }
+
+    const newUser = {
+        name, email, usn, pwd, role: "student", points: initialPoints,
+        referralCode: generateReferralCode(name), refUsed: refCode || null
+    };
+
+    usersDB.push(newUser);
+    showToast("Signup successful! Welcome.", "success");
+    loginUser(newUser);
 }
 
 function generateReferralCode(name) {
@@ -139,36 +132,13 @@ function generateReferralCode(name) {
     return `${prefix}${rand}`;
 }
 
-async function refreshUsersDatabase() {
-    try {
-        const response = await fetch(`${API_URL}/api/users`);
-        if (response.ok) {
-            const dbUsers = await response.json();
-            // Reinsert the hardcoded admin so admin login logic doesn't crash elsewhere
-            const admin = { name: "Admin Manager", email: "admin@college.edu", usn: "admin", pwd: "admin", role: "admin", points: 0, referralCode: "ADMIN", refUsed: null };
-            usersDB = [admin, ...dbUsers];
-            
-            // Instantly refresh UI elements that depend on usersDB
-            if (currentUser && currentUser.role === 'student') renderLeaderboard();
-            if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
-        }
-    } catch(err) {
-        console.error("Could not pull leaderboard data", err);
-    }
-}
-
 function loginUser(user) {
     currentUser = user;
     document.getElementById('authSection').classList.remove('active');
     document.getElementById('mainApp').style.display = 'block';
-    
-    // Automatically force the leaderboard to fetch MongoDB list before rendering
-    refreshUsersDatabase().then(() => {
-        setupEnvironment();
-    });
-    
+    setupEnvironment();
     document.getElementById('loginForm').reset();
-    document.getElementById('signupForm').reset(); // Always cleanly reset signup forms
+    document.getElementById('signupForm').reset();
 }
 
 function logout() {
