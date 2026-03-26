@@ -36,8 +36,25 @@ let cart = [];
 let currentUser = null;
 
 // --- Initialization ---
+async function syncPointsToDb() {
+    if (!currentUser || currentUser.role === 'admin') return;
+    try {
+        await fetch(`${API_URL}/api/update-points`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: currentUser.email, points: currentUser.points })
+        });
+    } catch(e) { } // Fire and forget background sync
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    if (!currentUser) {
+    const saved = localStorage.getItem('StoreCurrentUser');
+    if (saved) {
+        currentUser = JSON.parse(saved);
+        document.getElementById('authSection').classList.remove('active');
+        document.getElementById('mainApp').style.display = 'block';
+        refreshUsersDatabase().then(() => setupEnvironment());
+    } else {
         document.getElementById('authSection').classList.add('active');
         document.getElementById('mainApp').style.display = 'none';
     }
@@ -156,6 +173,8 @@ async function refreshUsersDatabase() {
 
 function loginUser(user) {
     currentUser = user;
+    localStorage.setItem('StoreCurrentUser', JSON.stringify(user));
+    
     document.getElementById('authSection').classList.remove('active');
     document.getElementById('mainApp').style.display = 'block';
     
@@ -170,6 +189,7 @@ function loginUser(user) {
 
 function logout() {
     currentUser = null;
+    localStorage.removeItem('StoreCurrentUser');
     cart = [];
     document.getElementById('mainApp').style.display = 'none';
     document.getElementById('authSection').classList.add('active');
@@ -898,6 +918,8 @@ function updateAdminOrderStatus(orderId, newStatus) {
 // --- Dashboards ---
 function updateStudentDashboard() {
     if (currentUser.role !== 'student') return;
+    syncPointsToDb(); // Securely backup the student's entire points map back to MongoDB!
+
 
     const myOrders = globalOrders.filter(o => o.userId === currentUser.email);
     const historyEl = document.getElementById('purchaseHistory');
