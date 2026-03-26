@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 5000; // Render will dynamically inject PORT
 // Middleware
 app.use(express.json()); // Parse JSON bodies
 app.use(cors({
-    origin: '*', // For development. Change to your Vercel URL in production
+    origin: 'https://store-repo-sigma.vercel.app', // For development. Change to your Vercel URL in production
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
 
