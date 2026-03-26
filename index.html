@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Campus Bookstore</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css?v=2">
+</head>
+
+<body>
+
+    <!-- Auth Section -->
+    <div id="authSection" class="auth-wrapper active">
+        <div class="auth-container">
+            <div class="text-center mb-2">
+                <i class="fas fa-graduation-cap text-primary" style="font-size: 3rem; margin-bottom: 0.5rem;"></i>
+                <h2 style="font-weight: 800;">CampusBook</h2>
+                <p class="text-muted">Smart Campus Bookstore</p>
+            </div>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Login</button>
+                <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Sign Up</button>
+            </div>
+
+            <form id="loginForm" class="auth-form active" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Email ID or USN</label>
+                    <input type="text" id="loginId" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPwd" value="" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 mt-1">Login</button>
+                <div class="text-center mt-2 text-sm text-muted"
+                    style="background:var(--bg-light); padding:1rem; border-radius:8px;">
+                    <strong>Admin:</strong> admin@college.edu / admin<br>
+                    <!--<strong>Student:</strong> john@college.edu / password123>-->
+                </div>
+            </form>
+
+            <form id="signupForm" class="auth-form" onsubmit="handleSignup(event)">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="regName" required>
+                </div>
+                <div class="form-group">
+                    <label>Email ID</label>
+                    <input type="email" id="regEmail" placeholder="student@gmail.com" required>
+                </div>
+                <div class="form-group">
+                    <label>USN</label>
+                    <input type="text" id="regUsn" placeholder="4PS23CS092" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="regPwd" required>
+                </div>
+                <div class="form-group">
+                    <label>Referral Code (Optional)</label>
+                    <input type="text" id="regReferral" placeholder="Earn 25 bonus pts!">
+                </div>
+                <button type="submit" class="btn btn-primary w-100 mt-1">Sign Up</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" style="display: none;">
+
+        <nav class="navbar">
+            <div class="logo">
+                <i class="fas fa-graduation-cap"></i>
+                <span>CampusBook</span>
+            </div>
+
+            <div class="nav-links" id="navLinks">
+                <!-- Dynamically populated -->
+            </div>
+
+            <div class="nav-icons" id="navIcons">
+                <div class="notification-icon" onclick="toggleNotifications(event)" id="bellIcon">
+                    <i class="fas fa-bell"></i>
+                    <span class="badge" id="notifBadge" style="display:none;">0</span>
+                    <div class="notification-dropdown" id="notifDropdown">
+                        <div style="padding: 1rem; border-bottom: 1px solid var(--border); font-weight: 700;">
+                            Notifications</div>
+                        <div id="notifList"></div>
+                    </div>
+                </div>
+
+                <div id="studentNavIcons" style="display: none; align-items: center; gap: 1.5rem;">
+                    <div class="cart-icon" onclick="toggleCart()">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="badge" id="cartCount">0</span>
+                    </div>
+                    <div class="account-icon" onclick="toggleAccountDropdown(event)" title="Account">
+                        <i class="fas fa-user-circle" style="font-size: 1.5rem;"></i>
+                        <div class="account-dropdown" id="accountDropdown">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <div id="adminNavIcons" style="display: none; align-items: center; gap: 1.5rem;">
+                    <button class="btn btn-outline text-sm" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="container">
+
+            <!-- 🏠 HOME PAGE -->
+            <section id="home" class="view-section active">
+
+                <div class="hero mb-2">
+                    <div class="hero-content">
+                        <h1>Welcome, <span id="heroName">Student</span>!</h1>
+                        <p>Skip the bookstore queues. Pre-order semester kits, grab essential books instantly, and track
+                            stock securely directly from your phone.</p>
+                        <button class="btn btn-white mt-1" onclick="scrollToProducts()"><i
+                                class="fas fa-shopping-bag"></i> Shop Now</button>
+                    </div>
+                </div>
+
+                <div class="highlight-cards mb-2" id="highlightGrid">
+                    <div class="highlight-card bg-warning-light">
+                        <div class="highlight-icon text-warning"><i class="fas fa-bolt"></i></div>
+                        <div class="highlight-text">
+                            <h3>Exam Essentials</h3>
+                            <p>Most bought quick items</p>
+                        </div>
+                    </div>
+                    <div class="highlight-card bg-primary-light">
+                        <div class="highlight-icon text-primary"><i class="fas fa-star"></i></div>
+                        <div class="highlight-text">
+                            <h3>Top Rated</h3>
+                            <p>Student favorites</p>
+                        </div>
+                    </div>
+                    <div class="highlight-card bg-success-light">
+                        <div class="highlight-icon text-success"><i class="fas fa-box-open"></i></div>
+                        <div class="highlight-text">
+                            <h3>New Arrivals</h3>
+                            <p>Latest lab manuals</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-container" id="products-section">
+                    <div class="catalog-header">
+                        <h2 class="section-title" style="margin:0;"><i class="fas fa-store text-primary"></i> Campus
+                            Catalog</h2>
+                        <div class="filters">
+                            <select id="branchFilter" onchange="filterProducts()">
+                                <option value="All">All Branches</option>
+                                <option value="CSE">CSE</option>
+                                <option value="ECE">ECE</option>
+                                <option value="MECH">Mechanical</option>
+                                <option value="CE">Civil</option>
+                                <option value="EE">Electrical</option>
+                            </select>
+                            <select id="semesterFilter" onchange="filterProducts()">
+                                <option value="All">All Semesters</option>
+                                <option value="1">1st Semester</option>
+                                <option value="2">2nd Semester</option>
+                                <option value="3">3rd Semester</option>
+                                <option value="4">4th Semester</option>
+                                <option value="5">5th Semester</option>
+                                <option value="6">6th Semester</option>
+                                <option value="7">7th Semester</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid" id="catalogGrid"></div>
+                </div>
+
+                <div class="section-container">
+                    <h2 class="section-title"><i class="fas fa-layer-group text-success"></i> Semester Kits & Bundles
+                    </h2>
+                    <div class="grid" id="bundlesGrid"></div>
+                </div>
+
+                <div class="section-container bg-leaderboard">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h2 class="section-title text-warning" style="margin-bottom:0;"><i class="fas fa-trophy"></i>
+                            Campus Top Earners</h2>
+                    </div>
+                    <p class="text-sm text-muted mb-2 mt-1">Earn points on purchases and climb the ranks!</p>
+                    <div class="leaderboard" id="leaderboardList"></div>
+                </div>
+            </section>
+
+            <!-- 👤 DASHBOARD (Orders & Tracking) -->
+            <section id="dashboard" class="view-section">
+                <div class="section-container">
+                    <h2 class="section-title"><i class="fas fa-route text-primary"></i> Order Timeline & History</h2>
+                    <p class="text-muted mb-2">Track your live orders, request cancellations, or modify incoming
+                        collections.</p>
+                    <div id="purchaseHistory" class="history-list mt-2"></div>
+                </div>
+            </section>
+
+            <!-- 🖨️ PRINT MODULE -->
+            <section id="printSection" class="view-section">
+                <div class="section-container">
+                    <h2 class="section-title"><i class="fas fa-print text-primary"></i> Upload for Print / Xerox</h2>
+                    <p class="text-muted mb-2">Upload your PDF locally. Admin prints it, you pick it up directly. Uses
+                        secure standard ticket formatting.</p>
+
+                    <div style="display:flex; gap:1.5rem; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:300px;">
+                            <form id="printForm" onsubmit="handlePrintRequest(event)"
+                                style="background:var(--bg-white); border:1px solid var(--border); padding:1.5rem; border-radius:var(--radius-md);">
+                                <div class="form-group mb-1">
+                                    <label>Select Document (PDF/Doc)</label>
+                                    <input type="file" id="printFile" accept=".pdf,.doc,.docx" required
+                                        style="padding: 0.5rem; background: var(--bg-light);">
+                                </div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                                    <div class="form-group mb-1">
+                                        <label>Pages to Print</label>
+                                        <input type="text" id="printPages" placeholder="e.g. 1-10 or All" required>
+                                    </div>
+                                    <div class="form-group mb-1">
+                                        <label>Number of Copies</label>
+                                        <input type="number" id="printCopies" min="1" value="1" required>
+                                    </div>
+                                </div>
+                                <div class="form-group mb-2">
+                                    <label>Print Format Type</label>
+                                    <select id="printFormatType" required>
+                                        <option value="Single Side">Single Sided</option>
+                                        <option value="Double Side">Double Sided (Back-to-Back)</option>
+                                        <option value="2 per page">2 Pages per sheet</option>
+                                        <option value="4 per page">4 Pages per sheet</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100" style="padding:0.75rem;"><i
+                                        class="fas fa-upload"></i> Process Print Request</button>
+                            </form>
+                        </div>
+
+                        <div style="flex:1; min-width:300px;">
+                            <h3 class="mb-1 text-success"><i class="fas fa-file-invoice"></i> Ready Evaluation Copies
+                            </h3>
+                            <p class="text-sm text-muted mb-2">Instantly push department-standard eval sheets without
+                                uploading manually.</p>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div
+                                    style="border:1px dashed var(--success); padding:1rem; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                                    <div>
+                                        <strong>CSE Eval Bundle</strong>
+                                        <p class="text-sm text-muted">Standard 10 Pages</p>
+                                    </div>
+                                    <button class="btn btn-outline"
+                                        onclick="pushStandardEval('CSE Standard Eval Bundle', 10)"><i
+                                            class="fas fa-paper-plane text-success"></i> Auto-Print</button>
+                                </div>
+                                <div
+                                    style="border:1px dashed var(--success); padding:1rem; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                                    <div>
+                                        <strong>ECE Eval Bundle</strong>
+                                        <p class="text-sm text-muted">Standard 12 Pages</p>
+                                    </div>
+                                    <button class="btn btn-outline"
+                                        onclick="pushStandardEval('ECE Standard Eval Bundle', 12)"><i
+                                            class="fas fa-paper-plane text-success"></i> Auto-Print</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-container mt-2">
+                    <h2 class="section-title"><i class="fas fa-history text-primary"></i> Active Print Tickets</h2>
+                    <div id="printRequestsList"></div>
+                </div>
+            </section>
+
+            <!-- 🛡️ ADMIN SECTION -->
+            <section id="admin" class="view-section">
+                <div class="section-container">
+                    <h2 class="section-title"><i class="fas fa-shield-alt text-primary"></i> Admin Control Panel</h2>
+                    <div class="dashboard-stats">
+                        <div class="stat-card">
+                            <i class="fas fa-chart-line text-success"></i>
+                            <h3 style="font-size:1.5rem; margin-bottom:0.25rem;">₹<span id="adminTotalSales">0</span>
+                            </h3>
+                            <p class="text-muted text-sm font-bold">Total Sales</p>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-boxes text-primary"></i>
+                            <h3 style="font-size:1.5rem; margin-bottom:0.25rem;" id="adminTotalOrders">0</h3>
+                            <p class="text-muted text-sm font-bold">Live Orders</p>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-paper-plane text-warning"></i>
+                            <h3 style="font-size:1.5rem; margin-bottom:0.25rem;" id="adminNotifsSent">0</h3>
+                            <p class="text-muted text-sm font-bold">Alerts Sent</p>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-users text-danger"></i>
+                            <h3 style="font-size:1.5rem; margin-bottom:0.25rem;" id="adminPendingReqs">0</h3>
+                            <p class="text-danger text-sm font-bold">Pending Reqs</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-container"
+                    style="display:flex; gap: 2rem; flex-wrap:wrap; background:transparent; padding:0; border:none; box-shadow:none;">
+
+                    <!-- Live Orders Queue -->
+                    <div class="section-container" style="flex:1; min-width:350px; margin-bottom:0;">
+                        <h2 class="section-title"><i class="fas fa-stream text-primary"></i> Live Order Tracking</h2>
+                        <div id="adminOrderQueue" style="display:flex; flex-direction:column; gap:1rem;"></div>
+                    </div>
+
+                    <!-- Inventory Manage -->
+                    <div class="section-container" style="flex:2; min-width:400px; margin-bottom:0;">
+                        <h2 class="section-title"><i class="fas fa-boxes text-success"></i> Store Inventory</h2>
+                        <div class="table-container">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Product Info</th>
+                                        <th>Price</th>
+                                        <th>Stock/Reqs</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventoryTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-container"
+                    style="display:flex; gap: 2rem; flex-wrap:wrap; background:transparent; padding:0; border:none; box-shadow:none; margin-top:2rem;">
+                    <div class="section-container" style="flex:1; min-width:350px; margin-bottom:0;">
+                        <h2 class="section-title"><i class="fas fa-print text-primary"></i> Print/Xerox Requests</h2>
+                        <div id="adminPrintQueue" style="display:flex; flex-direction:column; gap:1rem;"></div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Modals & Overlays -->
+    <div class="overlay" id="overlay" onclick="closeAllModals()"></div>
+
+    <div class="cart-sidebar" id="cartSidebar">
+        <div class="cart-header">
+            <h2 style="font-size: 1.25rem; display:flex; align-items:center; gap:0.5rem;"><i
+                    class="fas fa-shopping-basket"></i> Your Cart</h2>
+            <button class="btn-icon" onclick="toggleCart()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="cart-items" id="cartItems"></div>
+        <div class="cart-footer">
+            <div class="cart-total">
+                <span>Total:</span>
+                <span class="text-primary font-bold">₹<strong id="cartTotalPrice">0</strong></span>
+            </div>
+            <button class="btn btn-primary w-100" onclick="proceedToCheckout()" id="checkoutBtn"
+                style="padding:1rem; font-size:1.1rem;"><i class="fas fa-lock"></i> Checkout</button>
+        </div>
+    </div>
+
+    <!-- Alert Modal (Multi-use: Notifications & Refunds) -->
+    <div id="alertModal" class="modal">
+        <div class="modal-content text-center" id="alertModalContent">
+            <!-- Dynamically injected Alert payloads -->
+        </div>
+    </div>
+
+    <!-- Reorder Update Modal -->
+    <div id="reorderModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeAllModals()"><i class="fas fa-times"></i></span>
+            <h2 class="mb-1 text-primary"><i class="fas fa-redo"></i> Update Order Quantity</h2>
+            <p class="text-muted mb-2">You are about to cumulatively add the exact items from this order into your
+                existing ticket.</p>
+            <div id="reorderSummary"
+                style="background:var(--bg-light); border:1px dashed var(--border); padding: 1rem; border-radius:8px; margin-bottom:1.5rem;">
+            </div>
+            <div class="form-group">
+                <button id="reorderConfirmBtn" class="btn btn-primary w-100"
+                    style="padding: 1rem; font-size: 1.05rem;">Confirm Update Order</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cancel Order Modal -->
+    <div id="cancelModal" class="modal">
+        <div class="modal-content text-center">
+            <span class="close-modal" onclick="closeAllModals()"><i class="fas fa-times"></i></span>
+            <div style="font-size: 3rem; color: #EF4444; margin-bottom: 1rem;"><i
+                    class="fas fa-exclamation-triangle"></i></div>
+            <h2 class="mb-1">Cancel Order?</h2>
+            <p class="text-muted mb-2">A standard <strong>5% processing fee</strong> will be applied to your refund
+                deduction.</p>
+            <div id="cancelSummary" class="mb-2 text-left"
+                style="background:#FEF2F2; color:#B91C1C; padding:1rem; border-radius:8px; border:1px solid #FECACA;">
+            </div>
+            <div style="display:flex; gap:1rem;">
+                <button class="btn btn-outline" style="flex:1;" onclick="closeAllModals()">Go Back</button>
+                <button id="cancelConfirmBtn" class="btn btn-danger" style="flex:1;">Confirm Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div id="checkoutModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeAllModals()"><i class="fas fa-times"></i></span>
+            <h2 class="mb-2"><i class="fas fa-map-marker-alt text-primary"></i> Pickup Slot</h2>
+            <form id="checkoutForm" onsubmit="processPayment(event)">
+                <div class="form-group mb-2" id="rewardRedemptionContainer" style="display:none;">
+                    <label class="text-success" style="font-size:1rem;"><i class="fas fa-gift"></i> Rewards
+                        Available</label>
+                    <div
+                        style="display:flex; align-items:center; gap:0.5rem; background:#ECFDF5; padding:0.75rem; border:1px solid #A7F3D0; border-radius:var(--radius-md);">
+                        <input type="checkbox" id="useRewardPoints" onchange="updateCheckoutTotal()"
+                            style="width:20px; height:20px;">
+                        <span class="text-sm font-bold text-success">Redeem 300 points for ₹30 discount</span>
+                    </div>
+                </div>
+                <div class="form-group mb-2">
+                    <label>Select Collection Time Slot</label>
+                    <select id="pickupTime" required>
+                        <option value="">-- Choose Slot --</option>
+                        <option value="10:00 AM - 11:00 AM">10:00 AM - 11:00 AM</option>
+                        <option value="1:00 PM - 2:00 PM">1:00 PM - 2:00 PM</option>
+                        <option value="4:00 PM - 5:00 PM">4:00 PM - 5:00 PM</option>
+                    </select>
+                </div>
+                <div class="form-group mb-2">
+                    <label>Payment Gateway</label>
+                    <div class="upi-payment text-primary">
+                        <i class="fas fa-qrcode" style="font-size: 2rem; margin-bottom: 0.5rem; display:block;"></i>
+                        Pay ₹<span id="checkoutAmount"></span> via UPI
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Confirm Payment</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="script.js?v=2"></script>
+</body>
+
+</html>
