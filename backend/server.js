@@ -56,6 +56,17 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
+// Update specific user points on purchase
+app.post('/api/update-points', async (req, res) => {
+    try {
+        const { email, points } = req.body;
+        await User.findOneAndUpdate({ email }, { points: points });
+        res.json({ success: true });
+    } catch(err) {
+        res.status(500).json({ error: "Failed to sync points" });
+    }
+});
+
 // Authentication Routes
 app.post('/api/signup', async (req, res) => {
     try {
