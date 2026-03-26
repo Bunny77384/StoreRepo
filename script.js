@@ -72,9 +72,9 @@ function switchAuthTab(tab) {
     }
 }
 
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://localhost:5000' 
-    : 'https://store-api-backend.onrender.com'; // Change this if your Render URL changes!
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000'
+    : 'https://store-api-backend-cic4.onrender.com'; // Change this if your Render URL changes!
 
 async function handleLogin(e) {
     e.preventDefault();
@@ -87,7 +87,7 @@ async function handleLogin(e) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ loginId, pwd: loginPwd })
         });
-        
+
         const data = await response.json();
         if (response.ok) {
             showToast(data.message, "success");
@@ -120,7 +120,7 @@ async function handleSignup(e) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, email, usn, pwd, refCode })
         });
-        
+
         const data = await response.json();
         if (response.ok) {
             showToast(data.message, "success");
