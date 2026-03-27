@@ -28,6 +28,20 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
+const OrderSchema = new mongoose.Schema({
+    id: String,
+    userId: String,
+    userName: String,
+    usn: String,
+    items: Array,
+    total: Number,
+    date: String,
+    slot: String,
+    points: Number,
+    status: String
+});
+const Order = mongoose.model('Order', OrderSchema);
+
 // MOCK Products Database (for Catalog view)
 let products = [
     { id: 1, name: "Blue Book (60 Pages)", price: 20, category: "Exam", branch: "All", semester: "All", stock: 150, img: "📖" },
@@ -65,6 +79,29 @@ app.post('/api/update-points', async (req, res) => {
     } catch(err) {
         res.status(500).json({ error: "Failed to sync points" });
     }
+});
+
+// Orders Endpoints
+app.get('/api/orders', async (req, res) => {
+    try {
+        const orders = await Order.find({});
+        res.json(orders);
+    } catch(err) { res.status(500).json({ error: "Fetch orders failed" }); }
+});
+
+app.post('/api/orders', async (req, res) => {
+    try {
+        const newOrder = new Order(req.body);
+        await newOrder.save();
+        res.json({ success: true, order: newOrder });
+    } catch(err) { res.status(500).json({ error: "Create order failed" }); }
+});
+
+app.put('/api/orders/:id', async (req, res) => {
+    try {
+        await Order.findOneAndUpdate({ id: req.params.id }, { status: req.body.status });
+        res.json({ success: true });
+    } catch(err) { res.status(500).json({ error: "Update order failed" }); }
 });
 
 // Authentication Routes
