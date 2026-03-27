@@ -5,15 +5,15 @@ const cors = require('cors');
 
 const app = express();
 app.use(express.json());
-app.use(cors({ 
-    origin: ['https://store-repo-sigma.vercel.app', 'http://localhost:8000', 'http://127.0.0.1:8000'],
+app.use(cors({
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
 
 // MongoDB Atlas Connection
 mongoose.connect(process.env.DATABASE_URI)
-  .then(() => console.log("✅ Securely connected to MongoDB Atlas!"))
-  .catch(err => console.error("❌ Database connection failed:", err));
+    .then(() => console.log("✅ Securely connected!"))
+    .catch(err => console.error("❌ Database connection failed:", err));
 
 // MongoDB Schema Definitions
 const UserSchema = new mongoose.Schema({
@@ -65,7 +65,7 @@ app.get('/api/users', async (req, res) => {
     try {
         const users = await User.find({}, '-pwd'); // Get everyone without passwords
         res.json(users);
-    } catch(err) {
+    } catch (err) {
         res.status(500).json({ error: "Failed to fetch users" });
     }
 });
@@ -76,7 +76,7 @@ app.post('/api/update-points', async (req, res) => {
         const { email, points } = req.body;
         await User.findOneAndUpdate({ email }, { points: points });
         res.json({ success: true });
-    } catch(err) {
+    } catch (err) {
         res.status(500).json({ error: "Failed to sync points" });
     }
 });
@@ -86,7 +86,7 @@ app.get('/api/orders', async (req, res) => {
     try {
         const orders = await Order.find({});
         res.json(orders);
-    } catch(err) { res.status(500).json({ error: "Fetch orders failed" }); }
+    } catch (err) { res.status(500).json({ error: "Fetch orders failed" }); }
 });
 
 app.post('/api/orders', async (req, res) => {
@@ -94,24 +94,24 @@ app.post('/api/orders', async (req, res) => {
         const newOrder = new Order(req.body);
         await newOrder.save();
         res.json({ success: true, order: newOrder });
-    } catch(err) { res.status(500).json({ error: "Create order failed" }); }
+    } catch (err) { res.status(500).json({ error: "Create order failed" }); }
 });
 
 app.put('/api/orders/:id', async (req, res) => {
     try {
-        await Order.findOneAndUpdate({ id: req.params.id }, { status: req.body.status });
+        await Order.findOneAndUpdate({ id: req.params.id }, req.body);
         res.json({ success: true });
-    } catch(err) { res.status(500).json({ error: "Update order failed" }); }
+    } catch (err) { res.status(500).json({ error: "Update order failed" }); }
 });
 
 // Authentication Routes
 app.post('/api/signup', async (req, res) => {
     try {
         const { name, email, usn, pwd, refCode } = req.body;
-        
+
         const existingUser = await User.findOne({ $or: [{ email }, { usn }] });
         if (existingUser) return res.status(400).json({ error: "USN or Email already registered!" });
-        
+
         let initialPoints = 50;
         let refUsed = null;
         if (refCode) {
@@ -125,15 +125,15 @@ app.post('/api/signup', async (req, res) => {
                 return res.status(400).json({ error: "Invalid referral code." });
             }
         }
-        
+
         const referralCode = name.substring(0, 4).toUpperCase().replace(/\s/g, '') + Math.floor(100 + Math.random() * 900);
-        
+
         const newUser = new User({ name, email, usn, pwd, role: "student", points: initialPoints, referralCode, refUsed });
         await newUser.save();
-        
+
         const userObj = newUser.toObject();
         delete userObj.pwd;
-        
+
         res.json({ message: "Signup successful in MongoDB! Welcome.", user: userObj });
     } catch (err) {
         res.status(500).json({ error: "Backend Database Server Error" });
@@ -142,25 +142,25 @@ app.post('/api/signup', async (req, res) => {
 
 app.post('/api/login', async (req, res) => {
     const { loginId, pwd } = req.body;
-    
+
     // Support Admin Manual Login
     if (loginId === 'admin@college.edu' || loginId === 'admin') {
         if (pwd === 'admin') {
-            return res.json({ 
-                message: "Admin Login Successful!", 
-                user: { name: "Admin Manager", email: "admin@college.edu", usn: "admin", role: "admin", points: 0, referralCode: "ADMIN", refUsed: null } 
+            return res.json({
+                message: "Admin Login Successful!",
+                user: { name: "Admin Manager", email: "admin@college.edu", usn: "admin", role: "admin", points: 0, referralCode: "ADMIN", refUsed: null }
             });
         }
     }
-    
+
     try {
         const user = await User.findOne({ $or: [{ email: loginId }, { usn: loginId }] }).select('+pwd');
         if (!user || user.pwd !== pwd) return res.status(400).json({ error: "Invalid credentials! Check your Email/USN and Password." });
-        
+
         const userObj = user.toObject();
         delete userObj.pwd;
         res.json({ message: "Login strictly verified by MongoDB!", user: userObj });
-    } catch(err) {
+    } catch (err) {
         res.status(500).json({ error: "Server Error" });
     }
 });

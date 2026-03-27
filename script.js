@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser = JSON.parse(saved);
         document.getElementById('authSection').classList.remove('active');
         document.getElementById('mainApp').style.display = 'block';
-        refreshUsersDatabase().then(() => setupEnvironment());
+        Promise.all([refreshUsersDatabase(), refreshOrdersDatabase()]).then(() => setupEnvironment());
     } else {
         document.getElementById('authSection').classList.add('active');
         document.getElementById('mainApp').style.display = 'none';
@@ -163,11 +163,31 @@ async function refreshUsersDatabase() {
             const admin = { name: "Admin Manager", email: "admin@college.edu", usn: "admin", pwd: "admin", role: "admin", points: 0, referralCode: "ADMIN", refUsed: null };
             usersDB = [admin, ...dbUsers]; // Re-sync the core array instantly
             
-            if (currentUser && currentUser.role === 'student') renderLeaderboard();
+            if (currentUser && currentUser.role === 'student') {
+                const liveSync = usersDB.find(u => u.email === currentUser.email);
+                if (liveSync) {
+                    currentUser.points = liveSync.points;
+                    localStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
+                }
+                renderLeaderboard();
+            }
             if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
         }
     } catch(err) {
         console.error("Leaderboard Sync Failed", err);
+    }
+}
+
+async function refreshOrdersDatabase() {
+    try {
+        const response = await fetch(`${API_URL}/api/orders`);
+        if (response.ok) {
+            globalOrders = await response.json();
+            if (currentUser && currentUser.role === 'student') updateStudentDashboard();
+            if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
+        }
+    } catch(err) {
+        console.error("Orders Sync Failed", err);
     }
 }
 
@@ -179,7 +199,7 @@ function loginUser(user) {
     document.getElementById('mainApp').style.display = 'block';
     
     // Auto-sync the frontend database array right before rendering!
-    refreshUsersDatabase().then(() => {
+    Promise.all([refreshUsersDatabase(), refreshOrdersDatabase()]).then(() => {
         setupEnvironment();
     });
     
@@ -549,6 +569,7 @@ function processPayment(event) {
     if (isRedeeming) {
         total -= 30;
         currentUser.points -= 300;
+        localStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
         showToast("Redeemed 300 points for ₹30 discount!", "success");
         // Notify admin about reward redemption
         pushSystemNotification('admin@college.edu', 'Reward Redemption Alert', `${currentUser.name} (${currentUser.usn}) redeemed 300 points for ₹30 discount on Checkout.`);
@@ -565,13 +586,22 @@ function processPayment(event) {
         }
     });
 
-    globalOrders.push({
+    const newOrder = {
         id: orderId, userId: currentUser.email, userName: currentUser.name, usn: currentUser.usn,
         items: [...cart], total, date: new Date().toLocaleString(), slot: timeSlot, points: pointsEarned,
         status: 'Placed' // Status tracking active
-    });
+    };
+
+    globalOrders.push(newOrder);
+    
+    fetch(`${API_URL}/api/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOrder)
+    }).catch(e => console.error(e));
 
     currentUser.points += pointsEarned;
+    localStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
 
     cart = [];
     document.getElementById('checkoutForm').reset();
@@ -716,6 +746,13 @@ function processReorderFlex(orderId, newTotal) {
 
     order.items = [...tempReorderCart];
     order.total = newTotal;
+    
+    localStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
+    fetch(`${API_URL}/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(order)
+    }).catch(e => console.error(e));
 
     updateStudentDashboard();
     renderCatalog(products);
@@ -772,6 +809,13 @@ function processCancelOrder(orderId, fee, refund) {
 
     // Mutate state correctly securely
     order.status = 'Cancelled';
+    
+    localStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
+    fetch(`${API_URL}/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(order)
+    }).catch(e => console.error(e));
 
     updateStudentDashboard();
     renderCatalog(products);
@@ -904,6 +948,12 @@ function updateAdminOrderStatus(orderId, newStatus) {
     if (!order) return;
 
     order.status = newStatus;
+
+    fetch(`${API_URL}/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(order)
+    }).catch(e => console.error(e));
 
     if (newStatus === 'Accepted') {
         pushSystemNotification(order.userId, `Order Lifecycle Update: Accepted`, `Your order #${orderId} has been successfully received and accepted by the operator. It is now actively in preparation queue.`);
