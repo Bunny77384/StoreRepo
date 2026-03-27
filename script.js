@@ -58,6 +58,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('authSection').classList.add('active');
         document.getElementById('mainApp').style.display = 'none';
     }
+
+    // Dynamic Multi-Tab Polling Sync
+    setInterval(() => {
+        if (currentUser) {
+            refreshOrdersDatabase();
+        }
+    }, 5000);
 });
 
 // Click away listener for dropdowns
@@ -182,9 +189,12 @@ async function refreshOrdersDatabase() {
     try {
         const response = await fetch(`${API_URL}/api/orders`);
         if (response.ok) {
-            globalOrders = await response.json();
-            if (currentUser && currentUser.role === 'student') updateStudentDashboard();
-            if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
+            const fetchedOrders = await response.json();
+            if (JSON.stringify(fetchedOrders) !== JSON.stringify(globalOrders)) {
+                globalOrders = fetchedOrders;
+                if (currentUser && currentUser.role === 'student') updateStudentDashboard();
+                if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
+            }
         }
     } catch(err) {
         console.error("Orders Sync Failed", err);
