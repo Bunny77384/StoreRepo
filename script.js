@@ -4,7 +4,14 @@ let adminActiveTab = 'Active';
 async function fetchProductsFromDB() {
     try {
         const response = await fetch(`${API_URL}/api/products`);
-        if (response.ok) products = await response.json();
+        if (response.ok) {
+            products = await response.json();
+            // Re-sync UI with new DB state
+            if (currentUser) {
+                if (currentUser.role === 'student') renderCatalog(products);
+                if (currentUser.role === 'admin') updateAdminDashboard();
+            }
+        }
     } catch(err) { console.error("Stock Sync Error", err); }
 }
 

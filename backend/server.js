@@ -333,7 +333,11 @@ app.put('/api/prints/:id', async (req, res) => {
 // --- Report Downloads ---
 
 app.get('/api/admin/reports/csv', async (req, res) => {
-    const reports = await DailyReport.find({});
+    let reports = await DailyReport.find({});
+    if (reports.length === 0) {
+        await generateDailyReport(); // Auto-generate if empty
+        reports = await DailyReport.find({});
+    }
     const filePath = path.join(__dirname, 'daily_analytics.csv');
     const csvWriter = createObjectCsvWriter({
         path: filePath,
@@ -346,11 +350,15 @@ app.get('/api/admin/reports/csv', async (req, res) => {
     });
     
     await csvWriter.writeRecords(reports);
-    res.download(filePath, () => fs.unlinkSync(filePath));
+    res.download(filePath, () => { if(fs.existsSync(filePath)) fs.unlinkSync(filePath); });
 });
 
 app.get('/api/admin/reports/pdf', async (req, res) => {
-    const reports = await DailyReport.find({});
+    let reports = await DailyReport.find({});
+    if (reports.length === 0) {
+        await generateDailyReport();
+        reports = await DailyReport.find({});
+    }
     const doc = new PDFDocument();
     res.setHeader('Content-Type', 'application/pdf');
     doc.pipe(res);
