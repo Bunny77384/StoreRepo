@@ -38,7 +38,10 @@ const OrderSchema = new mongoose.Schema({
     date: String,
     slot: String,
     points: Number,
-    status: String
+    status: String,
+    redeemedPoints: { type: Boolean, default: false },
+    completionDate: String,
+    originalTotal: Number
 });
 const Order = mongoose.model('Order', OrderSchema);
 
@@ -221,22 +224,23 @@ app.get('/api/admin/analytics', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
     try {
         const orderData = req.body;
+        const originalTotal = orderData.items.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        orderData.originalTotal = originalTotal;
+
         const newOrder = new Order(orderData);
         await newOrder.save();
 
-        // Process inventory and analytics for each item
         for (const item of orderData.items) {
             await trackSale(item, orderData.date);
         }
 
-        // Handle redemption tracking if present
         if (orderData.redeemedPoints) {
             const rt = new RedeemTransaction({
                 orderId: orderData.id,
                 userId: orderData.userId,
                 userName: orderData.userName,
                 productNames: orderData.items.map(i => i.name),
-                discountAmount: 30, // Fixed redemption value context from frontend
+                discountAmount: 30,
                 finalPrice: orderData.total
             });
             await rt.save();
@@ -245,15 +249,18 @@ app.post('/api/orders', async (req, res) => {
         res.json({ success: true, order: newOrder });
     } catch (err) { 
         console.error(err);
-        res.status(500).json({ error: "Order failed to initialize securely" }); 
+        res.status(500).json({ error: "Order failed" }); 
     }
 });
 
 app.put('/api/orders/:id', async (req, res) => {
     try {
         const { status } = req.body;
-        const existing = await Order.findOne({ id: req.params.id });
+        if (status === 'Completed') {
+            req.body.completionDate = new Date().toLocaleString();
+        }
         
+        const existing = await Order.findOne({ id: req.params.id });
         if (status === 'Cancelled' && existing.status !== 'Cancelled') {
             for (const item of existing.items) {
                 await Product.findOneAndUpdate({ id: item.id }, { $inc: { stock: item.qty } });
@@ -261,7 +268,7 @@ app.put('/api/orders/:id', async (req, res) => {
         }
         await Order.findOneAndUpdate({ id: req.params.id }, req.body);
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Sync state update failed" }); }
+    } catch (err) { res.status(500).json({ error: "Update failed" }); }
 });
 
 app.get('/api/orders', async (req, res) => {
@@ -333,41 +340,92 @@ app.put('/api/prints/:id', async (req, res) => {
 // --- Report Downloads ---
 
 app.get('/api/admin/reports/csv', async (req, res) => {
-    let reports = await DailyReport.find({});
-    if (reports.length === 0) {
-        await generateDailyReport(); // Auto-generate if empty
-        reports = await DailyReport.find({});
-    }
-    const filePath = path.join(__dirname, 'daily_analytics.csv');
-    const csvWriter = createObjectCsvWriter({
-        path: filePath,
-        header: [
-            { id: 'date', title: 'Date' },
-            { id: 'totalRevenue', title: 'Revenue' },
-            { id: 'totalOrders', title: 'Orders' },
-            { id: 'cancelledOrders', title: 'Cancelled' }
-        ]
-    });
-    
-    await csvWriter.writeRecords(reports);
-    res.download(filePath, () => { if(fs.existsSync(filePath)) fs.unlinkSync(filePath); });
+    try {
+        const completedOrders = await Order.find({ status: 'Completed' });
+        const filePath = path.join(__dirname, 'completed_orders_audit.csv');
+        
+        const csvWriter = createObjectCsvWriter({
+            path: filePath,
+            header: [
+                { id: 'completionDate', title: 'Completed At' },
+                { id: 'id', title: 'Order #' },
+                { id: 'originalTotal', title: 'Original Amount' },
+                { id: 'total', title: 'Amount Paid' },
+                { id: 'redeemedPoints', title: 'Redeemed?' },
+                { id: 'discount', title: 'Discount Amount' }
+            ]
+        });
+
+        let totalSum = 0;
+        const records = completedOrders.map(o => {
+            const disc = o.redeemedPoints ? 30 : 0;
+            totalSum += o.total;
+            return {
+                completionDate: o.completionDate || o.date,
+                id: o.id,
+                originalTotal: o.originalTotal || o.total + disc,
+                total: o.total,
+                redeemedPoints: o.redeemedPoints ? 'Yes' : 'No',
+                discount: disc
+            };
+        });
+
+        records.push({ completionDate: 'TOTAL SUM', total: totalSum });
+
+        await csvWriter.writeRecords(records);
+        res.download(filePath, () => { if(fs.existsSync(filePath)) fs.unlinkSync(filePath); });
+    } catch(err) { res.status(500).send("Report error"); }
 });
 
 app.get('/api/admin/reports/pdf', async (req, res) => {
-    let reports = await DailyReport.find({});
-    if (reports.length === 0) {
-        await generateDailyReport();
-        reports = await DailyReport.find({});
-    }
-    const doc = new PDFDocument();
-    res.setHeader('Content-Type', 'application/pdf');
-    doc.pipe(res);
-    doc.fontSize(20).text('Monthly Sales Hub Report', { align: 'center' });
-    doc.moveDown();
-    reports.forEach(r => {
-        doc.fontSize(12).text(`Date: ${r.date} | Revenue: ₹${r.totalRevenue} | Orders: ${r.totalOrders}`);
-    });
-    doc.end();
+    try {
+        const completedOrders = await Order.find({ status: 'Completed' });
+        const doc = new PDFDocument({ margin: 30 });
+        res.setHeader('Content-Type', 'application/pdf');
+        doc.pipe(res);
+
+        doc.fontSize(22).text('Completed Orders Audit Report', { align: 'center' });
+        doc.fontSize(10).text(`Generated on: ${new Date().toLocaleString()}`, { align: 'center' });
+        doc.moveDown(2);
+
+        const startX = 30;
+        let currentY = doc.y;
+        
+        doc.fontSize(10).font('Helvetica-Bold');
+        doc.text('Date Completed', startX, currentY, { width: 120 });
+        doc.text('Order ID', startX + 130, currentY, { width: 80 });
+        doc.text('Orig Amount', startX + 220, currentY, { width: 80 });
+        doc.text('Paid', startX + 310, currentY, { width: 60 });
+        doc.text('Redeem?', startX + 380, currentY, { width: 60 });
+        doc.text('Disc', startX + 450, currentY, { width: 50 });
+        
+        doc.moveDown();
+        doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke();
+        doc.moveDown();
+
+        let totalSum = 0;
+        doc.font('Helvetica');
+        completedOrders.forEach(o => {
+            const disc = o.redeemedPoints ? 30 : 0;
+            totalSum += o.total;
+            if (doc.y > 700) doc.addPage();
+            const y = doc.y;
+            doc.text(o.completionDate || o.date, startX, y, { width: 120 });
+            doc.text(o.id, startX + 130, y, { width: 80 });
+            doc.text(`₹${o.originalTotal || o.total + disc}`, startX + 220, y, { width: 80 });
+            doc.text(`₹${o.total}`, startX + 310, y, { width: 60 });
+            doc.text(o.redeemedPoints ? 'Yes' : 'No', startX + 380, y, { width: 60 });
+            doc.text(`₹${disc}`, startX + 450, y, { width: 50 });
+            doc.moveDown();
+        });
+
+        doc.moveDown();
+        doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke();
+        doc.moveDown();
+        doc.fontSize(14).font('Helvetica-Bold').text(`GRAND TOTAL SUM: ₹${totalSum}`, { align: 'right' });
+
+        doc.end();
+    } catch(err) { res.status(500).send("PDF Error"); }
 });
 
 // Force generate a report for immediate validation
