@@ -1,3 +1,7 @@
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:5000' 
+    : 'https://store-api-backend-cic4.onrender.com';
+
 let products = []; // Fetched from Database now for True Sync
 let adminActiveTab = 'Active';
 
@@ -57,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Background Sync: Refresh all data collections
         Promise.all([
+            fetchProductsFromDB(), // Added back!
             refreshUsersDatabase(), 
             refreshOrdersDatabase(), 
             refreshNotificationsDatabase(), 
@@ -77,7 +82,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Dynamic Multi-Tab Polling Sync
     setInterval(() => {
         if (currentUser) {
+            fetchProductsFromDB(); // Real-time stock sync
             refreshOrdersDatabase();
+            if (currentUser.role === 'admin') refreshAdminAnalytics(); 
             refreshNotificationsDatabase();
             refreshPrintsDatabase();
         }
@@ -113,9 +120,6 @@ function switchAuthTab(tab) {
     }
 }
 
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://localhost:5000' 
-    : 'https://store-api-backend-cic4.onrender.com';
 
 async function handleLogin(e) {
     e.preventDefault();
