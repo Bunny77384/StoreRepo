@@ -422,17 +422,17 @@ app.get('/api/admin/reports/pdf', async (req, res) => {
             const y = doc.y;
             doc.text(formattedDate, startX, y, { width: 120 });
             doc.text(o.id, startX + 130, y, { width: 80 });
-            doc.text(`₹${o.originalTotal || (Number(o.total) + disc)}`, startX + 220, y, { width: 80 });
-            doc.text(`₹${o.total}`, startX + 310, y, { width: 60 });
+            doc.text(`Rs.${o.originalTotal || (Number(o.total) + disc)}`, startX + 220, y, { width: 80 });
+            doc.text(`Rs.${o.total}`, startX + 310, y, { width: 60 });
             doc.text(o.redeemedPoints ? 'Yes' : 'No', startX + 380, y, { width: 60 });
-            doc.text(`₹${disc}`, startX + 450, y, { width: 50 });
+            doc.text(`Rs.${disc}`, startX + 450, y, { width: 50 });
             doc.moveDown();
         });
 
         doc.moveDown();
         doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke();
         doc.moveDown();
-        doc.fontSize(14).font('Helvetica-Bold').text(`GRAND TOTAL SUM: ₹${totalSum}`, { align: 'right' });
+        doc.fontSize(14).font('Helvetica-Bold').text(`GRAND TOTAL SUM: Rs.${totalSum}`, { align: 'right' });
 
         doc.end();
     } catch(err) { res.status(500).send("PDF Error"); }

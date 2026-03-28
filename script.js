@@ -1149,7 +1149,7 @@ function updateAdminDashboard() {
     document.getElementById('inventoryTable').innerHTML = products.map(p => `
         <tr>
             <td><div style="display:flex; align-items:center; gap:0.5rem;"><span style="font-size: 1.5rem;">${p.img}</span> <strong>${p.name}</strong></div></td>
-            <td><strong class="text-primary">₹${p.price}</strong></td>
+            <td><strong class="text-primary">Rs.${p.price}</strong></td>
             <td><span class="${p.stock < 10 ? 'text-danger font-bold' : ''}">${p.stock} Units</span></td>
             <td><button class="btn btn-success text-sm" onclick="restockProduct(${p.id}, 50)"><i class="fas fa-plus"></i> Restock +50</button></td>
         </tr>`).join('');
@@ -1170,7 +1170,7 @@ function updateAdminDashboard() {
                  <div>
                     <p><strong>Student:</strong> ${o.userName} (${o.usn})</p>
                     <p><strong>Slot:</strong> ${o.slot}</p>
-                    <strong class="text-primary">₹${o.total}</strong>
+                    <strong class="text-primary">Rs.${o.total}</strong>
                  </div>
                  <div style="text-align:right;">
                     ${o.status === 'Cancelled' ? '<span class="badge-status bg-Cancelled">Cancelled</span>' : 
