@@ -257,7 +257,7 @@ app.put('/api/orders/:id', async (req, res) => {
     try {
         const { status } = req.body;
         if (status === 'Completed') {
-            req.body.completionDate = new Date().toLocaleString();
+            req.body.completionDate = new Date().toISOString();
         }
         
         const existing = await Order.findOne({ id: req.params.id });
@@ -360,10 +360,13 @@ app.get('/api/admin/reports/csv', async (req, res) => {
         const records = completedOrders.map(o => {
             const disc = o.redeemedPoints ? 30 : 0;
             totalSum += o.total;
+            let formattedDate = o.completionDate || o.date;
+            try { if(o.completionDate) formattedDate = new Date(o.completionDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); } catch(e){}
+
             return {
-                completionDate: o.completionDate || o.date,
+                completionDate: formattedDate,
                 id: o.id,
-                originalTotal: o.originalTotal || o.total + disc,
+                originalTotal: o.originalTotal || (Number(o.total) + disc),
                 total: o.total,
                 redeemedPoints: o.redeemedPoints ? 'Yes' : 'No',
                 discount: disc
@@ -408,11 +411,14 @@ app.get('/api/admin/reports/pdf', async (req, res) => {
         completedOrders.forEach(o => {
             const disc = o.redeemedPoints ? 30 : 0;
             totalSum += o.total;
+            let formattedDate = o.completionDate || o.date;
+            try { if(o.completionDate) formattedDate = new Date(o.completionDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); } catch(e){}
+
             if (doc.y > 700) doc.addPage();
             const y = doc.y;
-            doc.text(o.completionDate || o.date, startX, y, { width: 120 });
+            doc.text(formattedDate, startX, y, { width: 120 });
             doc.text(o.id, startX + 130, y, { width: 80 });
-            doc.text(`₹${o.originalTotal || o.total + disc}`, startX + 220, y, { width: 80 });
+            doc.text(`₹${o.originalTotal || (Number(o.total) + disc)}`, startX + 220, y, { width: 80 });
             doc.text(`₹${o.total}`, startX + 310, y, { width: 60 });
             doc.text(o.redeemedPoints ? 'Yes' : 'No', startX + 380, y, { width: 60 });
             doc.text(`₹${disc}`, startX + 450, y, { width: 50 });

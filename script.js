@@ -1164,7 +1164,7 @@ function updateAdminDashboard() {
         <div class="card p-1" style="border-left: 4px solid ${o.status === 'Cancelled' ? '#EF4444' : (o.status === 'Completed' ? '#10B981' : 'var(--primary)')};">
             <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
                 <span class="text-primary font-bold">#${o.id}</span>
-                <span class="text-sm text-muted">${o.status === 'Completed' && o.completionDate ? `<i class="fas fa-check-circle"></i> ${o.completionDate}` : o.date}</span>
+                <span class="text-sm text-muted">${o.status === 'Completed' && o.completionDate ? `<i class="fas fa-check-circle"></i> ${new Date(o.completionDate).toLocaleString()}` : o.date}</span>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center;">
                  <div>
