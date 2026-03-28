@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="style.css?v=2">
     <!-- Prevent UI Flicker for authenticated users -->
     <script>
-        (function() {
+        (function () {
             const saved = sessionStorage.getItem('StoreCurrentUser');
             if (saved) {
                 document.documentElement.classList.add('is-authenticated');
@@ -298,8 +298,10 @@
                 <div class="section-container" style="display:flex; justify-content:space-between; align-items:center;">
                     <h2 class="section-title"><i class="fas fa-shield-alt text-primary"></i> Admin Control Panel</h2>
                     <div style="display:flex; gap:0.5rem;">
-                        <button class="btn btn-outline text-sm" onclick="downloadReport('pdf')"><i class="fas fa-file-pdf"></i> PDF Audit</button>
-                        <button class="btn btn-outline text-sm" onclick="downloadReport('csv')"><i class="fas fa-file-csv"></i> CSV Audit</button>
+                        <button class="btn btn-outline text-sm" onclick="downloadReport('pdf')"><i
+                                class="fas fa-file-pdf"></i> PDF Audit</button>
+                        <button class="btn btn-outline text-sm" onclick="downloadReport('csv')"><i
+                                class="fas fa-file-csv"></i> CSV Audit</button>
                     </div>
                 </div>
 
@@ -334,11 +336,14 @@
                 <div class="section-container" style="margin-top:2rem;">
                     <h2 class="section-title"><i class="fas fa-stream text-primary"></i> Order Tracking Hub</h2>
                     <div class="admin-tabs">
-                        <button class="admin-tab active" id="tab-Active" onclick="switchAdminOrderTab('Active')">Active Orders</button>
-                        <button class="admin-tab" id="tab-Completed" onclick="switchAdminOrderTab('Completed')">Completed</button>
-                        <button class="admin-tab" id="tab-Cancelled" onclick="switchAdminOrderTab('Cancelled')">Cancelled</button>
+                        <button class="admin-tab active" id="tab-Active" onclick="switchAdminOrderTab('Active')">Active
+                            Orders</button>
+                        <button class="admin-tab" id="tab-Completed"
+                            onclick="switchAdminOrderTab('Completed')">Completed</button>
+                        <!--<button class="admin-tab" id="tab-Cancelled" onclick="switchAdminOrderTab('Cancelled')">Cancelled</button>-->
                     </div>
-                    <div id="adminOrderQueue" style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;"></div>
+                    <div id="adminOrderQueue" style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
+                    </div>
                 </div>
 
                 <div class="section-container">
