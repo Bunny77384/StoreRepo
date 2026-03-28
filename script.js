@@ -51,11 +51,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const saved = localStorage.getItem('StoreCurrentUser');
     if (saved) {
         currentUser = JSON.parse(saved);
-        document.getElementById('authSection').classList.remove('active');
+        // Sync UI for current user role IMMEDIATELY so they don't see the wrong dash or empty links
+        setupEnvironment(); 
+
+        // Background Sync: Refresh all data collections
+        Promise.all([
+            refreshUsersDatabase(), 
+            refreshOrdersDatabase(), 
+            refreshNotificationsDatabase(), 
+            refreshPrintsDatabase()
+        ]).catch(err => console.error("Initial Sync Issue", err));
+        
+        // Hide auth if our early inline script didn't catch it for some reason
+        document.getElementById('authSection').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
-        Promise.all([refreshUsersDatabase(), refreshOrdersDatabase(), refreshNotificationsDatabase(), refreshPrintsDatabase()]).then(() => setupEnvironment());
     } else {
+        // No session, show the login UI
+        document.documentElement.classList.remove('is-authenticated');
         document.getElementById('authSection').classList.add('active');
+        document.getElementById('authSection').style.display = 'flex';
         document.getElementById('mainApp').style.display = 'none';
     }
 
@@ -244,6 +258,7 @@ function loginUser(user) {
     localStorage.setItem('StoreCurrentUser', JSON.stringify(user));
     
     document.getElementById('authSection').classList.remove('active');
+    document.getElementById('authSection').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     
     // Auto-sync the frontend database array right before rendering!
@@ -258,9 +273,11 @@ function loginUser(user) {
 function logout() {
     currentUser = null;
     localStorage.removeItem('StoreCurrentUser');
+    document.documentElement.classList.remove('is-authenticated'); // Remove flicker-fix
     cart = [];
     document.getElementById('mainApp').style.display = 'none';
     document.getElementById('authSection').classList.add('active');
+    document.getElementById('authSection').style.display = 'flex';
     closeAllModals();
     showToast("Logged out successfully", "info");
 }
@@ -274,6 +291,7 @@ function setupEnvironment() {
         `;
         document.getElementById('studentNavIcons').style.display = 'none';
         document.getElementById('adminNavIcons').style.display = 'flex';
+        document.getElementById('bellIcon').style.display = 'none';
         showSection('admin');
         updateAdminDashboard();
     } else {
@@ -285,6 +303,7 @@ function setupEnvironment() {
         `;
         document.getElementById('studentNavIcons').style.display = 'flex';
         document.getElementById('adminNavIcons').style.display = 'none';
+        document.getElementById('bellIcon').style.display = 'flex';
 
         document.getElementById('heroName').textContent = currentUser.name.split(" ")[0];
 

@@ -10,12 +10,21 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css?v=2">
+    <!-- Prevent UI Flicker for authenticated users -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('StoreCurrentUser');
+            if (saved) {
+                document.documentElement.classList.add('is-authenticated');
+            }
+        })();
+    </script>
 </head>
 
 <body>
 
     <!-- Auth Section -->
-    <div id="authSection" class="auth-wrapper active">
+    <div id="authSection" class="auth-wrapper">
         <div class="auth-container">
             <div class="text-center mb-2">
                 <i class="fas fa-graduation-cap text-primary" style="font-size: 3rem; margin-bottom: 0.5rem;"></i>
