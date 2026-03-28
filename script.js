@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser = JSON.parse(saved);
         document.getElementById('authSection').classList.remove('active');
         document.getElementById('mainApp').style.display = 'block';
-        Promise.all([refreshUsersDatabase(), refreshOrdersDatabase()]).then(() => setupEnvironment());
+        Promise.all([refreshUsersDatabase(), refreshOrdersDatabase(), refreshNotificationsDatabase(), refreshPrintsDatabase()]).then(() => setupEnvironment());
     } else {
         document.getElementById('authSection').classList.add('active');
         document.getElementById('mainApp').style.display = 'none';
@@ -63,6 +63,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(() => {
         if (currentUser) {
             refreshOrdersDatabase();
+            refreshNotificationsDatabase();
+            refreshPrintsDatabase();
         }
     }, 5000);
 });
@@ -201,6 +203,42 @@ async function refreshOrdersDatabase() {
     }
 }
 
+async function refreshNotificationsDatabase() {
+    try {
+        const response = await fetch(`${API_URL}/api/notifications`);
+        if (response.ok) {
+            const fetched = await response.json();
+            if (JSON.stringify(fetched) !== JSON.stringify(systemNotifs)) {
+                // Find notifs specifically meant for me that aren't in my local array yet
+                const newForMe = fetched.filter(f => f.userId === currentUser.email && !systemNotifs.some(old => old.id === f.id));
+                systemNotifs = fetched;
+                
+                updateNotificationsBadge();
+                if (document.getElementById('notifDropdown').classList.contains('active')) renderNotifDropdown();
+
+                newForMe.forEach(n => {
+                    if (n.alertStr) triggerVisualAlertModal(JSON.parse(n.alertStr));
+                    else showToast(`New Alert: ${n.title}`, 'info');
+                });
+            }
+        }
+    } catch(err) {}
+}
+
+async function refreshPrintsDatabase() {
+    try {
+        const response = await fetch(`${API_URL}/api/prints`);
+        if (response.ok) {
+            const fetched = await response.json();
+            if (JSON.stringify(fetched) !== JSON.stringify(printRequests)) {
+                printRequests = fetched;
+                if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
+                if (currentUser && currentUser.role === 'student') updatePrintUI();
+            }
+        }
+    } catch(err) {}
+}
+
 function loginUser(user) {
     currentUser = user;
     localStorage.setItem('StoreCurrentUser', JSON.stringify(user));
@@ -209,7 +247,7 @@ function loginUser(user) {
     document.getElementById('mainApp').style.display = 'block';
     
     // Auto-sync the frontend database array right before rendering!
-    Promise.all([refreshUsersDatabase(), refreshOrdersDatabase()]).then(() => {
+    Promise.all([refreshUsersDatabase(), refreshOrdersDatabase(), refreshNotificationsDatabase(), refreshPrintsDatabase()]).then(() => {
         setupEnvironment();
     });
     
@@ -881,7 +919,14 @@ function notifyMe(productId) {
 }
 
 function pushSystemNotification(userId, title, desc, triggerAlertObj = null) {
-    systemNotifs.push({ id: Date.now() + Math.random(), userId, title, desc, unread: true, timestamp: new Date().toLocaleTimeString() });
+    const notifObj = { id: (Date.now() + Math.random()).toString(), userId, title, desc, unread: true, timestamp: new Date().toLocaleTimeString(), alertStr: triggerAlertObj ? JSON.stringify(triggerAlertObj) : null };
+    systemNotifs.push(notifObj);
+
+    fetch(`${API_URL}/api/notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notifObj)
+    }).catch(e=>console.error(e));
 
     if (currentUser && currentUser.email === userId) {
         updateNotificationsBadge();
@@ -921,8 +966,15 @@ function renderNotifDropdown() {
 }
 
 function markNotifRead(id) {
-    const n = systemNotifs.find(not => not.id === id);
-    if (n) n.unread = false;
+    const n = systemNotifs.find(not => not.id == id);
+    if (n) {
+        n.unread = false;
+        fetch(`${API_URL}/api/notifications/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(n)
+        }).catch(e=>console.error(e));
+    }
     updateNotificationsBadge();
     renderNotifDropdown();
 }
@@ -1128,10 +1180,17 @@ function handlePrintRequest(e) {
     const fileName = fileInput.files[0].name;
     const reqId = getGenerateOrderId(currentUser.usn);
 
-    printRequests.push({
+    const reqObj = {
         id: reqId, userId: currentUser.email, fileName, pages, copies, format,
         status: 'Submitted', date: new Date().toLocaleDateString()
-    });
+    };
+    printRequests.push(reqObj);
+
+    fetch(`${API_URL}/api/prints`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reqObj)
+    }).catch(e=>console.error(e));
 
     document.getElementById('printForm').reset();
     showToast(`Print Ticket ${reqId} Submitted Successfully!`, "success");
@@ -1142,10 +1201,17 @@ function handlePrintRequest(e) {
 
 function pushStandardEval(bundleName, pageCount) {
     const reqId = getGenerateOrderId(currentUser.usn);
-    printRequests.push({
+    const reqObj = {
         id: reqId, userId: currentUser.email, fileName: `System Gen: ${bundleName}`, pages: `1-${pageCount}`, copies: 1, format: "Double Side",
         status: 'Submitted', date: new Date().toLocaleDateString()
-    });
+    };
+    printRequests.push(reqObj);
+
+    fetch(`${API_URL}/api/prints`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reqObj)
+    }).catch(e=>console.error(e));
     showToast(`System Print Ticket ${reqId} dispatched directly to Admin!`, "success");
     updatePrintUI();
     pushSystemNotification('admin@college.edu', 'System Eval Print', `Student auto-requested ${bundleName} via Ticket ${reqId}.`);
@@ -1178,6 +1244,11 @@ function markPrintReady(reqId) {
     let req = printRequests.find(r => r.id === reqId);
     if (req) {
         req.status = 'Ready';
+        fetch(`${API_URL}/api/prints/${reqId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(req)
+        }).catch(e=>console.error(e));
         pushSystemNotification(req.userId, `Print Request Ready!`, `Your document ${req.fileName} is printed and ready for pickup.`);
         updateAdminDashboard();
         showToast("Print request marked ready.", "success");

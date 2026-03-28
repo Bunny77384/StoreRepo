@@ -254,9 +254,17 @@ body { background-color: var(--bg-light); color: var(--text-main); line-height: 
 /* Mobile responsiveness */
 @media (max-width: 768px) {
     .navbar { padding: 1rem; }
-    .hero { padding: 3rem 1rem; }
-    .hero h1 { font-size: 2rem; }
-    .dashboard-stats { grid-template-columns: 1fr 1fr; }
+    .nav-links { gap: 0.75rem; font-size: 0.9rem; }
+    p { font-size: 0.95rem; }
+    .container { padding: 1rem; }
+    .hero { padding: 2.5rem 1rem; }
+    .hero h1 { font-size: 1.8rem; }
+    .dashboard-stats { grid-template-columns: 1fr; }
     .cart-sidebar { width: 100%; right: -100%; }
-    .account-dropdown { right: -50px; }
+    .account-dropdown { right: -20px; width: 260px; }
+    .auth-container { padding: 1.5rem; }
+    .filters { flex-wrap: wrap; }
+    .filters select { flex: 1; }
+    .section-container { padding: 1.25rem; }
+    .section-title { font-size: 1.25rem; }
 }

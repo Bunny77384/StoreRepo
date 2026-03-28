@@ -42,6 +42,29 @@ const OrderSchema = new mongoose.Schema({
 });
 const Order = mongoose.model('Order', OrderSchema);
 
+const NotificationSchema = new mongoose.Schema({
+    id: String,
+    userId: String,
+    title: String,
+    desc: String,
+    unread: { type: Boolean, default: true },
+    timestamp: String,
+    alertStr: String
+});
+const Notification = mongoose.model('Notification', NotificationSchema);
+
+const PrintSchema = new mongoose.Schema({
+    id: String,
+    userId: String,
+    fileName: String,
+    pages: String,
+    copies: String,
+    format: String,
+    status: String,
+    date: String
+});
+const PrintRequest = mongoose.model('PrintRequest', PrintSchema);
+
 // MOCK Products Database (for Catalog view)
 let products = [
     { id: 1, name: "Blue Book (60 Pages)", price: 20, category: "Exam", branch: "All", semester: "All", stock: 150, img: "📖" },
@@ -102,6 +125,48 @@ app.put('/api/orders/:id', async (req, res) => {
         await Order.findOneAndUpdate({ id: req.params.id }, req.body);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: "Update order failed" }); }
+});
+
+// Notification Endpoints
+app.get('/api/notifications', async (req, res) => {
+    try {
+        const notifs = await Notification.find({});
+        res.json(notifs);
+    } catch (err) { res.status(500).json({ error: "Fetch notifs failed" }); }
+});
+app.post('/api/notifications', async (req, res) => {
+    try {
+        const newNotif = new Notification(req.body);
+        await newNotif.save();
+        res.json({ success: true, notification: newNotif });
+    } catch (err) { res.status(500).json({ error: "Create notif failed" }); }
+});
+app.put('/api/notifications/:id', async (req, res) => {
+    try {
+        await Notification.findOneAndUpdate({ id: req.params.id }, req.body);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: "Update notif failed" }); }
+});
+
+// Print Endpoints
+app.get('/api/prints', async (req, res) => {
+    try {
+        const prints = await PrintRequest.find({});
+        res.json(prints);
+    } catch (err) { res.status(500).json({ error: "Fetch prints failed" }); }
+});
+app.post('/api/prints', async (req, res) => {
+    try {
+        const newPrint = new PrintRequest(req.body);
+        await newPrint.save();
+        res.json({ success: true, print: newPrint });
+    } catch (err) { res.status(500).json({ error: "Create print failed" }); }
+});
+app.put('/api/prints/:id', async (req, res) => {
+    try {
+        await PrintRequest.findOneAndUpdate({ id: req.params.id }, req.body);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: "Update print failed" }); }
 });
 
 // Authentication Routes
