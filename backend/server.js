@@ -137,7 +137,11 @@ seedProducts();
 
 app.get('/api/products', async (req, res) => {
     try {
-        const prodList = await Product.find({}).sort({ id: 1 });
+        let prodList = await Product.find({}).sort({ id: 1 });
+        if (prodList.length === 0) {
+            await seedProducts(); // Auto-heal if deleted by accident
+            prodList = await Product.find({}).sort({ id: 1 });
+        }
         res.json(prodList);
     } catch (err) { res.status(500).json({ error: "Fetch products failed" }); }
 });
