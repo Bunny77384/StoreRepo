@@ -274,7 +274,6 @@ function setupEnvironment() {
         `;
         document.getElementById('studentNavIcons').style.display = 'none';
         document.getElementById('adminNavIcons').style.display = 'flex';
-        document.getElementById('bellIcon').style.display = 'none';
         showSection('admin');
         updateAdminDashboard();
     } else {
@@ -286,7 +285,6 @@ function setupEnvironment() {
         `;
         document.getElementById('studentNavIcons').style.display = 'flex';
         document.getElementById('adminNavIcons').style.display = 'none';
-        document.getElementById('bellIcon').style.display = 'flex';
 
         document.getElementById('heroName').textContent = currentUser.name.split(" ")[0];
 
@@ -1021,6 +1019,8 @@ function updateAdminOrderStatus(orderId, newStatus) {
         pushSystemNotification(order.userId, `Order Lifecycle Update: Accepted`, `Your order #${orderId} has been successfully received and accepted by the operator. It is now actively in preparation queue.`);
     } else if (newStatus === 'Ready') {
         pushSystemNotification(order.userId, `Order Lifecycle Update: Collection Ready!`, `Good news! Your order #${orderId} is entirely prepared and packed. Waiting at collection bounds for slot: ${order.slot}.`);
+    } else if (newStatus === 'Completed') {
+        pushSystemNotification(order.userId, `Order Successfully Completed!`, `Thank you for shopping at CampusBook! Your order #${orderId} has been securely handed over to you. Have a great semester ahead!`);
     }
 
     showToast(`Order #${orderId} securely pushed to ${newStatus}. User notification pinged remotely.`, "success");
@@ -1099,10 +1099,11 @@ function updateStudentDashboard() {
 
 function updateAdminDashboard() {
     let validOrdersArray = globalOrders.filter(o => o.status !== 'Cancelled');
+    let activeLiveOrders = validOrdersArray.filter(o => o.status !== 'Completed');
     const totalSales = validOrdersArray.reduce((sum, o) => sum + o.total, 0);
 
     document.getElementById('adminTotalSales').textContent = totalSales;
-    document.getElementById('adminTotalOrders').textContent = validOrdersArray.length;
+    document.getElementById('adminTotalOrders').textContent = activeLiveOrders.length;
     document.getElementById('adminPendingReqs').textContent = notifyRequests.length;
     document.getElementById('adminNotifsSent').textContent = adminNotifsSentCounter;
 
@@ -1122,7 +1123,9 @@ function updateAdminDashboard() {
         </tr>`
     }).join('');
 
-    document.getElementById('adminOrderQueue').innerHTML = globalOrders.slice().reverse().map(o => `
+    let queueToDisplay = globalOrders.filter(o => o.status !== 'Completed');
+    
+    document.getElementById('adminOrderQueue').innerHTML = queueToDisplay.slice().reverse().map(o => `
         <div style="background:white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; box-shadow: var(--shadow-sm); border-left: 4px solid ${o.status === 'Cancelled' ? '#EF4444' : 'var(--primary)'};">
             <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
                 <span class="text-primary font-bold">#${o.id}</span>
