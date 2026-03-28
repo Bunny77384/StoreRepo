@@ -452,7 +452,24 @@ app.post('/api/signup', async (req, res) => {
         if (existingUser) return res.status(400).json({ error: "USN already used." });
         
         const referralCode = name.substring(0, 4).toUpperCase() + Math.floor(100+Math.random()*900);
-        const newUser = new User({ name, email, usn, pwd, role: "student", points: 50, referralCode });
+        let startingPoints = 50; // Standard signup bonus
+        let refUsedByMe = null;
+
+        if (refCode) {
+            const referrer = await User.findOne({ referralCode: refCode });
+            if (referrer) {
+                referrer.points += 50; // Award 50 bonus points to existing student
+                await referrer.save();
+                refUsedByMe = refCode;
+                startingPoints += 25; // 75 Total (50 base + 25 bonus)
+            }
+        }
+
+        const newUser = new User({ 
+            name, email, usn, pwd, role: "student", 
+            points: startingPoints, referralCode, 
+            refUsed: refUsedByMe 
+        });
         await newUser.save();
         res.json({ message: "Signup success", user: newUser });
     } catch(err) { res.status(500).json({ error: "DB Error" }); }
