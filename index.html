@@ -13,7 +13,7 @@
     <!-- Prevent UI Flicker for authenticated users -->
     <script>
         (function() {
-            const saved = localStorage.getItem('StoreCurrentUser');
+            const saved = sessionStorage.getItem('StoreCurrentUser');
             if (saved) {
                 document.documentElement.classList.add('is-authenticated');
             }

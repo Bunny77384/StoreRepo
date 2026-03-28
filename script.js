@@ -48,7 +48,7 @@ async function syncPointsToDb() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const saved = localStorage.getItem('StoreCurrentUser');
+    const saved = sessionStorage.getItem('StoreCurrentUser');
     if (saved) {
         currentUser = JSON.parse(saved);
         // Sync UI for current user role IMMEDIATELY so they don't see the wrong dash or empty links
@@ -190,7 +190,7 @@ async function refreshUsersDatabase() {
                 const liveSync = usersDB.find(u => u.email === currentUser.email);
                 if (liveSync) {
                     currentUser.points = liveSync.points;
-                    localStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
+                    sessionStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
                 }
                 renderLeaderboard();
             }
@@ -255,7 +255,7 @@ async function refreshPrintsDatabase() {
 
 function loginUser(user) {
     currentUser = user;
-    localStorage.setItem('StoreCurrentUser', JSON.stringify(user));
+    sessionStorage.setItem('StoreCurrentUser', JSON.stringify(user));
     
     document.getElementById('authSection').classList.remove('active');
     document.getElementById('authSection').style.display = 'none';
@@ -272,7 +272,7 @@ function loginUser(user) {
 
 function logout() {
     currentUser = null;
-    localStorage.removeItem('StoreCurrentUser');
+    sessionStorage.removeItem('StoreCurrentUser');
     document.documentElement.classList.remove('is-authenticated'); // Remove flicker-fix
     cart = [];
     document.getElementById('mainApp').style.display = 'none';
@@ -634,7 +634,7 @@ function processPayment(event) {
     if (isRedeeming) {
         total -= 30;
         currentUser.points -= 300;
-        localStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
+        sessionStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
         showToast("Redeemed 300 points for ₹30 discount!", "success");
         // Notify admin about reward redemption
         pushSystemNotification('admin@college.edu', 'Reward Redemption Alert', `${currentUser.name} (${currentUser.usn}) redeemed 300 points for ₹30 discount on Checkout.`);
@@ -666,7 +666,7 @@ function processPayment(event) {
     }).catch(e => console.error(e));
 
     currentUser.points += pointsEarned;
-    localStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
+    sessionStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
 
     cart = [];
     document.getElementById('checkoutForm').reset();
