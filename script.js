@@ -1,4 +1,9 @@
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+const isLocal = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname) || 
+               window.location.hostname.startsWith('192.168.') || 
+               window.location.hostname.startsWith('10.') || 
+               window.location.hostname.startsWith('172.');
+
+const API_URL = isLocal 
     ? 'http://localhost:5000' 
     : 'https://store-api-backend-cic4.onrender.com';
 
@@ -210,12 +215,9 @@ async function refreshOrdersDatabase() {
     try {
         const response = await fetch(`${API_URL}/api/orders`);
         if (response.ok) {
-            const fetchedOrders = await response.json();
-            if (JSON.stringify(fetchedOrders) !== JSON.stringify(globalOrders)) {
-                globalOrders = fetchedOrders;
-                if (currentUser && currentUser.role === 'student') updateStudentDashboard();
-                if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
-            }
+            globalOrders = await response.json();
+            if (currentUser && currentUser.role === 'student') updateStudentDashboard();
+            if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
         }
     } catch(err) {
         console.error("Orders Sync Failed", err);
@@ -230,15 +232,18 @@ async function refreshNotificationsDatabase() {
             if (JSON.stringify(fetched) !== JSON.stringify(systemNotifs)) {
                 // Find notifs specifically meant for me that aren't in my local array yet
                 const newForMe = fetched.filter(f => f.userId === currentUser.email && !systemNotifs.some(old => old.id === f.id));
+                const isInitialLoad = systemNotifs.length === 0;
                 systemNotifs = fetched;
                 
                 updateNotificationsBadge();
                 if (document.getElementById('notifDropdown').classList.contains('active')) renderNotifDropdown();
 
-                newForMe.forEach(n => {
-                    if (n.alertStr) triggerVisualAlertModal(JSON.parse(n.alertStr));
-                    else showToast(`New Alert: ${n.title}`, 'info');
-                });
+                if (!isInitialLoad) {
+                    newForMe.forEach(n => {
+                        if (n.alertStr) triggerVisualAlertModal(JSON.parse(n.alertStr));
+                        else showToast(`New Alert: ${n.title}`, 'info');
+                    });
+                }
             }
         }
     } catch(err) {}
@@ -1125,10 +1130,17 @@ function updateStudentDashboard() {
 
 function updateAdminDashboard() {
     const today = new Date().toLocaleDateString();
+    
+    // Today's Sales calculation (Based on status Completed or Active placed Today)
     let dailyOrders = globalOrders.filter(o => o.date.includes(today) && o.status !== 'Cancelled');
-    const totalSales = dailyOrders.reduce((sum, o) => sum + o.total, 0);
+    const todaySales = dailyOrders.reduce((sum, o) => sum + (['completed', 'ready'].includes(o.status?.toLowerCase()) ? Number(o.total) : 0), 0);
 
-    document.getElementById('adminTotalSales').textContent = totalSales;
+    // Lifetime Revenue calculation (Case-insensitive match for Audit symmetry)
+    const completedOrders = globalOrders.filter(o => o.status?.toLowerCase() === 'completed');
+    const lifetimeRevenue = completedOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    
+    document.getElementById('adminTotalSales').textContent = todaySales;
+    document.getElementById('adminLifetimeRev').textContent = lifetimeRevenue;
     document.getElementById('adminTotalOrders').textContent = globalOrders.filter(o => o.status === 'Placed' || o.status === 'Accepted').length;
     document.getElementById('adminPendingReqs').textContent = notifyRequests.length;
     document.getElementById('adminNotifsSent').textContent = adminNotifsSentCounter;
