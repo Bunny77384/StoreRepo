@@ -295,67 +295,96 @@
 
             <!-- 🛡️ ADMIN SECTION -->
             <section id="admin" class="view-section">
-                <div class="section-container">
+                <div class="section-container" style="display:flex; justify-content:space-between; align-items:center;">
                     <h2 class="section-title"><i class="fas fa-shield-alt text-primary"></i> Admin Control Panel</h2>
-                    <div class="dashboard-stats">
-                        <div class="stat-card">
-                            <i class="fas fa-chart-line text-success"></i>
-                            <h3 style="font-size:1.5rem; margin-bottom:0.25rem;">₹<span id="adminTotalSales">0</span>
-                            </h3>
-                            <p class="text-muted text-sm font-bold">Total Sales</p>
-                        </div>
-                        <div class="stat-card">
-                            <i class="fas fa-boxes text-primary"></i>
-                            <h3 style="font-size:1.5rem; margin-bottom:0.25rem;" id="adminTotalOrders">0</h3>
-                            <p class="text-muted text-sm font-bold">Live Orders</p>
-                        </div>
-                        <div class="stat-card">
-                            <i class="fas fa-paper-plane text-warning"></i>
-                            <h3 style="font-size:1.5rem; margin-bottom:0.25rem;" id="adminNotifsSent">0</h3>
-                            <p class="text-muted text-sm font-bold">Alerts Sent</p>
-                        </div>
-                        <div class="stat-card">
-                            <i class="fas fa-users text-danger"></i>
-                            <h3 style="font-size:1.5rem; margin-bottom:0.25rem;" id="adminPendingReqs">0</h3>
-                            <p class="text-danger text-sm font-bold">Pending Reqs</p>
-                        </div>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn btn-outline text-sm" onclick="downloadReport('pdf')"><i class="fas fa-file-pdf"></i> PDF Report</button>
+                        <button class="btn btn-outline text-sm" onclick="downloadReport('csv')"><i class="fas fa-file-csv"></i> CSV Report</button>
                     </div>
                 </div>
 
-                <div class="section-container"
-                    style="display:flex; gap: 2rem; flex-wrap:wrap; background:transparent; padding:0; border:none; box-shadow:none;">
-
-                    <!-- Live Orders Queue -->
-                    <div class="section-container" style="flex:1; min-width:350px; margin-bottom:0;">
-                        <h2 class="section-title"><i class="fas fa-stream text-primary"></i> Live Order Tracking</h2>
-                        <div id="adminOrderQueue" style="display:flex; flex-direction:column; gap:1rem;"></div>
+                <div class="dashboard-stats">
+                    <div class="stat-card">
+                        <i class="fas fa-chart-line text-success"></i>
+                        <h3 style="font-size:1.5rem; margin-bottom:0.25rem;">₹<span id="adminTotalSales">0</span></h3>
+                        <p class="text-muted text-sm font-bold">Total Sales</p>
                     </div>
-
-                    <!-- Inventory Manage -->
-                    <div class="section-container" style="flex:2; min-width:400px; margin-bottom:0;">
-                        <h2 class="section-title"><i class="fas fa-boxes text-success"></i> Store Inventory</h2>
-                        <div class="table-container">
-                            <table class="admin-table">
-                                <thead>
-                                    <tr>
-                                        <th>Product Info</th>
-                                        <th>Price</th>
-                                        <th>Stock/Reqs</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="inventoryTable"></tbody>
-                            </table>
-                        </div>
+                    <div class="stat-card">
+                        <i class="fas fa-boxes text-primary"></i>
+                        <h3 style="font-size:1.5rem; margin-bottom:0.25rem;" id="adminTotalOrders">0</h3>
+                        <p class="text-muted text-sm font-bold">Live Orders</p>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-paper-plane text-warning"></i>
+                        <h3 style="font-size:1.5rem; margin-bottom:0.25rem;" id="adminNotifsSent">0</h3>
+                        <p class="text-muted text-sm font-bold">Alerts Sent</p>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-users text-danger"></i>
+                        <h3 style="font-size:1.5rem; margin-bottom:0.25rem;" id="adminPendingReqs">0</h3>
+                        <p class="text-danger text-sm font-bold">Pending Reqs</p>
                     </div>
                 </div>
 
-                <div class="section-container"
-                    style="display:flex; gap: 2rem; flex-wrap:wrap; background:transparent; padding:0; border:none; box-shadow:none; margin-top:2rem;">
-                    <div class="section-container" style="flex:1; min-width:350px; margin-bottom:0;">
-                        <h2 class="section-title"><i class="fas fa-print text-primary"></i> Print/Xerox Requests</h2>
-                        <div id="adminPrintQueue" style="display:flex; flex-direction:column; gap:1rem;"></div>
+                <div class="section-container" style="margin-top:2rem;">
+                    <h2 class="section-title"><i class="fas fa-stream text-primary"></i> Order Tracking Hub</h2>
+                    <div class="admin-tabs">
+                        <button class="admin-tab active" id="tab-Active" onclick="switchAdminOrderTab('Active')">Active Orders</button>
+                        <button class="admin-tab" id="tab-Completed" onclick="switchAdminOrderTab('Completed')">Completed</button>
+                        <button class="admin-tab" id="tab-Cancelled" onclick="switchAdminOrderTab('Cancelled')">Cancelled</button>
                     </div>
+                    <div id="adminOrderQueue" style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;"></div>
+                </div>
+
+                <div class="section-container">
+                    <h2 class="section-title"><i class="fas fa-boxes text-success"></i> Store Inventory</h2>
+                    <div class="table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Product Info</th>
+                                    <th>Price</th>
+                                    <th>Stock/Reqs</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventoryTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="section-container">
+                    <h2 class="section-title text-success"><i class="fas fa-chart-bar"></i> Daily Sold Products</h2>
+                    <div class="table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>Quantity Sold</th>
+                                    <th>Daily Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody id="soldProductsTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="section-container">
+                    <h2 class="section-title text-warning"><i class="fas fa-gift"></i> Redeem Transactions</h2>
+                    <div class="table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>User</th>
+                                    <th>Discount</th>
+                                    <th>Final Price</th>
+                                </tr>
+                            </thead>
+                            <tbody id="redeemTransactionsTable"></tbody>
+                        </table>
+                    </div>
+                    <div id="adminPrintQueue" style="display:none;"></div>
                 </div>
             </section>
 

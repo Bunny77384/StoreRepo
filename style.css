@@ -103,6 +103,12 @@ body { background-color: var(--bg-light); color: var(--text-main); line-height: 
 .auth-form { display: none; }
 .auth-form.active { display: block; animation: fadeIn 0.3s; }
 
+/* Admin Tabs */
+.admin-tabs { display: flex; gap: 0.5rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; }
+.admin-tab { padding: 0.5rem 1.5rem; border: none; background: none; font-weight: 700; color: var(--text-muted); cursor: pointer; transition: var(--transition); border-radius: 6px; }
+.admin-tab:hover { background: var(--bg-light); color: var(--primary); }
+.admin-tab.active { background: var(--primary); color: white; }
+
 /* Navbar */
 .navbar { position: sticky; top: 0; z-index: 100; background-color: var(--bg-white); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-md); }
 .logo { display: flex; align-items: center; gap: 0.5rem; font-size: 1.5rem; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }

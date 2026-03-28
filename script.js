@@ -1,18 +1,12 @@
-// --- Mock Database ---
-const products = [
-    { id: 1, name: "Blue Book (60 Pages)", price: 20, category: "Exam", branch: "All", semester: "All", stock: 150, img: "📖" },
-    { id: 2, name: "Pink Book (40 Pages)", price: 20, category: "Exam", branch: "All", semester: "All", stock: 200, img: "📕" },
-    { id: 3, name: "Graph Sheets (10 Pcs)", price: 10, category: "Stationery", branch: "All", semester: "All", stock: 50, img: "📉" },
-    { id: 4, name: "Record Book", price: 80, category: "Lab", branch: "All", semester: "All", stock: 0, img: "📓" },
-    { id: 5, name: "Engineering Drawing Kit", price: 450, category: "Kits", branch: "MECH", semester: "1", stock: 15, img: "📐" },
-    { id: 6, name: "Microprocessor Lab Manual", price: 120, category: "Lab", branch: "CSE", semester: "5", stock: 0, img: "📘" },
-    { id: 7, name: "Scientific Calculator", price: 950, category: "Electronics", branch: "All", semester: "1", stock: 10, img: "🧮" },
-    { id: 8, name: "Blue Ball Pen (Set of 5)", price: 50, category: "Stationery", branch: "All", semester: "All", stock: 100, img: "🖊️" },
-    { id: 9, name: "A4 Project Paper (100 Pcs)", price: 120, category: "Stationery", branch: "All", semester: "All", stock: 80, img: "📄" },
-    { id: 10, name: "DS Lab Manual + Eval Copy", price: 150, category: "Combo", branch: "CSE", semester: "3", stock: 100, img: "📚" },
-    { id: 11, name: "VLSI Lab Manual + Eval Copy", price: 160, category: "Combo", branch: "ECE", semester: "6", stock: 50, img: "📜" },
-    { id: 12, name: "Fluid Mechanics Manual + Eval", price: 140, category: "Combo", branch: "MECH", semester: "4", stock: 40, img: "🛠️" }
-];
+let products = []; // Fetched from Database now for True Sync
+let adminActiveTab = 'Active';
+
+async function fetchProductsFromDB() {
+    try {
+        const response = await fetch(`${API_URL}/api/products`);
+        if (response.ok) products = await response.json();
+    } catch(err) { console.error("Stock Sync Error", err); }
+}
 
 const bundles = [
     { id: "b1", name: "CSE 3rd Semester Kit", price: 350, originalPrice: 400, img: "🎒", items: ["DS Lab Manual", "OOP Lab Manual", "2 Blue Books", "1 Graph Set"] },
@@ -654,7 +648,7 @@ function processPayment(event) {
     const newOrder = {
         id: orderId, userId: currentUser.email, userName: currentUser.name, usn: currentUser.usn,
         items: [...cart], total, date: new Date().toLocaleString(), slot: timeSlot, points: pointsEarned,
-        status: 'Placed' // Status tracking active
+        status: 'Placed', redeemedPoints: isRedeeming
     };
 
     globalOrders.push(newOrder);
@@ -663,6 +657,8 @@ function processPayment(event) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newOrder)
+    }).then(res => res.json()).then(d => {
+        if(d.success) fetchProductsFromDB(); // SYNC STOCK IMMEDIATELY
     }).catch(e => console.error(e));
 
     currentUser.points += pointsEarned;
@@ -1117,64 +1113,59 @@ function updateStudentDashboard() {
 }
 
 function updateAdminDashboard() {
-    let validOrdersArray = globalOrders.filter(o => o.status !== 'Cancelled');
-    let activeLiveOrders = validOrdersArray.filter(o => o.status !== 'Completed');
-    const totalSales = validOrdersArray.reduce((sum, o) => sum + o.total, 0);
+    const today = new Date().toLocaleDateString();
+    let dailyOrders = globalOrders.filter(o => o.date.includes(today) && o.status !== 'Cancelled');
+    const totalSales = dailyOrders.reduce((sum, o) => sum + o.total, 0);
 
     document.getElementById('adminTotalSales').textContent = totalSales;
-    document.getElementById('adminTotalOrders').textContent = activeLiveOrders.length;
+    document.getElementById('adminTotalOrders').textContent = globalOrders.filter(o => o.status === 'Placed' || o.status === 'Accepted').length;
     document.getElementById('adminPendingReqs').textContent = notifyRequests.length;
     document.getElementById('adminNotifsSent').textContent = adminNotifsSentCounter;
 
-    document.getElementById('inventoryTable').innerHTML = products.map(p => {
-        const itemReqs = notifyRequests.filter(r => r.productId === p.id).length;
-        const reqBadge = itemReqs > 0 ? `<span class="badge" style="position:static; margin-left: 0.5rem; background:#FEF3C7; border: 1px solid #D97706; color: #D97706;">${itemReqs} Needs Limit</span>` : '';
-
-        return `
+    // Inventory Sync Table
+    document.getElementById('inventoryTable').innerHTML = products.map(p => `
         <tr>
             <td><div style="display:flex; align-items:center; gap:0.5rem;"><span style="font-size: 1.5rem;">${p.img}</span> <strong>${p.name}</strong></div></td>
             <td><strong class="text-primary">₹${p.price}</strong></td>
-            <td>
-                <span style="display:block; color: ${p.stock < 10 ? 'red' : 'inherit'}; font-weight: ${p.stock < 10 ? 'bold' : 'normal'}">${p.stock} Units Checked</span>
-                <div class="mt-1">${reqBadge}</div>
-            </td>
-            <td><button class="btn btn-success text-sm" onclick="simulateStockRestock(${p.id})"><i class="fas fa-plus"></i> Restock Control</button></td>
-        </tr>`
-    }).join('');
+            <td><span class="${p.stock < 10 ? 'text-danger font-bold' : ''}">${p.stock} Units</span></td>
+            <td><button class="btn btn-success text-sm" onclick="restockProduct(${p.id}, 50)"><i class="fas fa-plus"></i> Restock +50</button></td>
+        </tr>`).join('');
 
-    let queueToDisplay = globalOrders.filter(o => o.status !== 'Completed');
-    
+    // Tabbed Order Queue
+    let queueToDisplay = globalOrders.filter(o => {
+        if (adminActiveTab === 'Active') return o.status !== 'Completed' && o.status !== 'Cancelled';
+        return o.status === adminActiveTab;
+    });
+
     document.getElementById('adminOrderQueue').innerHTML = queueToDisplay.slice().reverse().map(o => `
-        <div style="background:white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; box-shadow: var(--shadow-sm); border-left: 4px solid ${o.status === 'Cancelled' ? '#EF4444' : 'var(--primary)'};">
+        <div class="card p-1" style="border-left: 4px solid ${o.status === 'Cancelled' ? '#EF4444' : (o.status === 'Completed' ? '#10B981' : 'var(--primary)')};">
             <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
                 <span class="text-primary font-bold">#${o.id}</span>
                 <span class="text-sm text-muted">${o.date}</span>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
                  <div>
-                    <p><strong>Student Target:</strong> ${o.userName}</p>
-                    <p><strong>Pickup Node:</strong> ${o.slot}</p>
-                    <strong class="text-primary d-block mt-1">₹${o.total}</strong>
+                    <p><strong>Student:</strong> ${o.userName} (${o.usn})</p>
+                    <p><strong>Slot:</strong> ${o.slot}</p>
+                    <strong class="text-primary">₹${o.total}</strong>
                  </div>
-                 
                  <div style="text-align:right;">
-                    ${o.status === 'Cancelled' ?
-            `<span class="badge-status bg-Cancelled"><i class="fas fa-times"></i> Cancelled Lock</span>` :
-            `<label class="text-sm font-bold text-muted d-block mb-1">Set Active Hook</label>
-                         <select class="admin-select bg-${o.status}" onchange="updateAdminOrderStatus('${o.id}', this.value)">
-                            ${o.status === 'Placed' ? `<option value="Placed" selected>Placed</option>` : ''}
-                            <option value="Accepted" ${o.status === 'Accepted' ? 'selected' : ''}>Order Accepted</option>
-                            <option value="Ready" ${o.status === 'Ready' ? 'selected' : ''}>Order Ready</option>
-                            <option value="Completed" ${o.status === 'Completed' ? 'selected' : ''}>Order Completed</option>
-                         </select>`
-        }
+                    ${o.status === 'Cancelled' ? '<span class="badge-status bg-Cancelled">Cancelled</span>' : 
+                      o.status === 'Completed' ? '<span class="badge-status bg-Completed">Completed</span>' : `
+                      <select class="admin-select bg-${o.status}" onchange="updateAdminOrderStatus('${o.id}', this.value)">
+                        <option value="Placed" ${o.status === 'Placed' ? 'selected' : ''}>Placed</option>
+                        <option value="Accepted" ${o.status === 'Accepted' ? 'selected' : ''}>Accepted</option>
+                        <option value="Ready" ${o.status === 'Ready' ? 'selected' : ''}>Ready</option>
+                        <option value="Completed" ${o.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                        <option value="Cancelled">Cancel Order</option>
+                      </select>`}
                  </div>
             </div>
         </div>
-    `).join('') || `<div class="text-center text-muted">No external trackers assigned.</div>`;
+    `).join('') || `<div class="text-center text-muted p-2">No ${adminActiveTab} orders found.</div>`;
 
     document.getElementById('adminPrintQueue').innerHTML = printRequests.slice().reverse().map(r => `
-        <div style="background:white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; box-shadow: var(--shadow-sm); border-left: 4px solid var(--primary);">
+        <div class="card p-1" style="border-left: 4px solid var(--primary);">
             <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
                 <span class="text-primary font-bold">#${r.id}</span>
                 <span class="text-sm text-muted">${r.date}</span>
@@ -1183,12 +1174,72 @@ function updateAdminDashboard() {
             <p><strong>Config:</strong> Pages ${r.pages}, ${r.copies} Copies | Format: <strong>${r.format}</strong></p>
             <div style="text-align:right; margin-top:0.5rem;">
                 ${r.status === 'Ready' || r.status === 'Completed' ?
-            `<span class="badge-status bg-Ready">${r.status}</span>` :
-            `<button class="btn btn-success text-sm" onclick="markPrintReady('${r.id}')"><i class="fas fa-check"></i> Mark Ready</button>`
-        }
+                    `<span class="badge-status bg-Ready">${r.status}</span>` :
+                    `<button class="btn btn-success text-sm" onclick="markPrintReady('${r.id}')"><i class="fas fa-check"></i> Mark Ready</button>`
+                }
             </div>
         </div>
-    `).join('') || `<div class="text-center text-muted">No print requests.</div>`;
+    `).join('') || `<div class="text-center text-muted p-2">No print requests found.</div>`;
+}
+
+async function refreshAdminAnalytics() {
+    try {
+        const response = await fetch(`${API_URL}/api/admin/analytics`);
+        if (response.ok) {
+            const data = await response.json();
+            renderSoldProducts(data.sold);
+            renderRedeemTransactions(data.redeems);
+        }
+    } catch(err) {}
+}
+
+function switchAdminOrderTab(tab) {
+    adminActiveTab = tab;
+    document.querySelectorAll('.admin-tab').forEach(t => {
+        t.classList.remove('active');
+        if (t.id === `tab-${tab}`) t.classList.add('active');
+    });
+    updateAdminDashboard();
+}
+
+function renderSoldProducts(soldList) {
+    const today = new Date().toLocaleDateString();
+    document.getElementById('soldProductsTable').innerHTML = soldList.filter(s => new Date(s.date).toLocaleDateString() === today).map(s => `
+        <tr>
+            <td>${s.productName}</td>
+            <td class="font-bold">${s.quantitySold}</td>
+            <td class="text-success font-bold">₹${s.revenue}</td>
+        </tr>`).join('');
+}
+
+function renderRedeemTransactions(redeems) {
+    const today = new Date().toLocaleDateString();
+    document.getElementById('redeemTransactionsTable').innerHTML = redeems.filter(r => new Date(r.date).toLocaleDateString() === today).map(r => `
+        <tr>
+            <td>${r.orderId}</td>
+            <td>${r.userName}</td>
+            <td class="text-success font-bold">-₹${r.discountAmount}</td>
+            <td class="font-bold">₹${r.finalPrice}</td>
+        </tr>`).join('');
+}
+
+async function restockProduct(id, amount) {
+    try {
+        const res = await fetch(`${API_URL}/api/products/restock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, amount })
+        });
+        if (res.ok) {
+            showToast(`Restocked +${amount} successfully!`, "success");
+            fetchProductsFromDB().then(() => updateAdminDashboard());
+            pushSystemNotification('all', 'Inventory Update', `Store Manager restocked items. Check catalog!`);
+        }
+    } catch(err) { showToast("Restock sync failed", "error"); }
+}
+
+function downloadReport(type) {
+    window.location.href = `${API_URL}/api/admin/reports/${type}`;
 }
 
 function handlePrintRequest(e) {
