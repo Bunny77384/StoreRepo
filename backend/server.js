@@ -289,6 +289,15 @@ app.get('/api/users', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Failed to fetch users" }); }
 });
 
+app.delete('/api/users/:email', async (req, res) => {
+    try {
+        const { email } = req.params;
+        if (email === 'admin@college.edu') return res.status(403).json({ error: "Cannot delete admin!" });
+        await User.findOneAndDelete({ email });
+        res.json({ success: true, message: "User deleted successfully" });
+    } catch (err) { res.status(500).json({ error: "Failed to delete user" }); }
+});
+
 app.post('/api/update-points', async (req, res) => {
     try {
         const { email, points } = req.body;
