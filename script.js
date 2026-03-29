@@ -15,9 +15,9 @@ async function fetchProductsFromDB() {
         const response = await fetch(`${API_URL}/api/products`);
         if (response.ok) {
             products = await response.json();
-            // Re-sync UI with new DB state
+            // Re-sync UI with new DB state while RESPECTING active filters
             if (currentUser) {
-                if (currentUser.role === 'student') renderCatalog(products);
+                if (currentUser.role === 'student') filterProducts(); 
                 if (currentUser.role === 'admin') updateAdminDashboard();
             }
         }
@@ -438,8 +438,15 @@ function renderLeaderboard() {
 
 // --- Catalog Systems ---
 function filterProducts() {
-    const branch = document.getElementById('branchFilter').value;
-    const sem = document.getElementById('semesterFilter').value;
+    const bFilter = document.getElementById('branchFilter');
+    const sFilter = document.getElementById('semesterFilter');
+    if (!bFilter || !sFilter) {
+        renderCatalog(products);
+        return;
+    }
+
+    const branch = bFilter.value;
+    const sem = sFilter.value;
     let filtered = products;
     if (branch !== 'All') filtered = filtered.filter(p => p.branch === 'All' || p.branch === branch);
     if (sem !== 'All') filtered = filtered.filter(p => p.semester === 'All' || p.semester === sem);
