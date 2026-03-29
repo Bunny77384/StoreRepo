@@ -202,9 +202,13 @@ async function refreshUsersDatabase() {
                 if (liveSync) {
                     currentUser.points = liveSync.points;
                     sessionStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
+                    renderLeaderboard();
+                    if (document.getElementById('accountDropdown').classList.contains('active')) renderAccountDropdown();
+                } else {
+                    // Critical security: User exists in local storage but not in DB (deleted)
+                    console.warn("Account terminated. Logging out...");
+                    logout(); 
                 }
-                renderLeaderboard();
-                if (document.getElementById('accountDropdown').classList.contains('active')) renderAccountDropdown();
             }
             if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
         }
@@ -1205,38 +1209,6 @@ function updateAdminDashboard() {
             </div>
         </div>
     `).join('') || `<div class="text-center text-muted p-2">No print requests found.</div>`;
-
-    // 🧑‍🎓 Student Management Sync
-    const userTable = document.getElementById('adminUsersTable');
-    if (userTable) {
-        userTable.innerHTML = usersDB.filter(u => u.role !== 'admin').map(u => `
-            <tr>
-                <td data-label="Full Name"><strong>${u.name}</strong></td>
-                <td data-label="Status">${u.email} <br><small class="text-muted">${u.usn}</small></td>
-                <td data-label="Points"><span class="leaderboard-pts">${u.points}</span></td>
-                <td data-label="Code"><code>${u.referralCode}</code></td>
-                <td data-label="Action">
-                    <button class="btn btn-danger-outline text-sm" onclick="deleteUser('${u.email}')" title="Delete Account">
-                        <i class="fas fa-trash-alt"></i> Delete
-                    </button>
-                </td>
-            </tr>
-        `).join('') || `<tr><td colspan="5" class="text-center text-muted p-4">No students registered yet.</td></tr>`;
-    }
-}
-
-async function deleteUser(email) {
-    if (!confirm(`Are you sure you want to PERMANENTLY delete user ${email}? \n\nThis will remove their points and account history.`)) return;
-    try {
-        const response = await fetch(`${API_URL}/api/users/${email}`, { method: 'DELETE' });
-        if (response.ok) {
-            showToast("Student deleted successfully!", "success");
-            refreshUsersDatabase(); // Sync UI immediately
-        } else {
-            const data = await response.json();
-            showToast(data.error || "Failed to delete user.", "error");
-        }
-    } catch (err) { showToast("Server error during deletion", "error"); }
 }
 
 async function refreshAdminAnalytics() {
