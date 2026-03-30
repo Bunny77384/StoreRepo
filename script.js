@@ -1142,13 +1142,20 @@ function updateStudentDashboard() {
 }
 
 function updateAdminDashboard() {
-    const today = new Date().toLocaleDateString();
+    const todayStr = new Date().toLocaleDateString();
     
-    // Today's Sales calculation (Based on status Completed or Active placed Today)
-    let dailyOrders = globalOrders.filter(o => o.date.includes(today) && o.status !== 'Cancelled');
-    const todaySales = dailyOrders.reduce((sum, o) => sum + (['completed', 'ready'].includes(o.status?.toLowerCase()) ? Number(o.total) : 0), 0);
+    // Today's Sales: Include all non-cancelled orders placed today
+    // Robust check: Compare only the date portion (before the comma/time)
+    let dailyOrders = globalOrders.filter(o => {
+        if (!o.date || o.status === 'Cancelled') return false;
+        const oDatePart = o.date.split(',')[0].trim();
+        const tDatePart = todayStr.split(',')[0].trim();
+        return oDatePart === tDatePart;
+    });
 
-    // Lifetime Revenue calculation (Case-insensitive match for Audit symmetry)
+    const todaySales = dailyOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+    // Lifetime Revenue: Sum of all COMPLETED orders ever
     const completedOrders = globalOrders.filter(o => o.status?.toLowerCase() === 'completed');
     const lifetimeRevenue = completedOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
     
