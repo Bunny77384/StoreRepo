@@ -1161,10 +1161,10 @@ function updateAdminDashboard() {
     // Inventory Sync Table
     document.getElementById('inventoryTable').innerHTML = products.map(p => `
         <tr>
-            <td><div style="display:flex; align-items:center; gap:0.5rem;"><span style="font-size: 1.5rem;">${p.img}</span> <strong>${p.name}</strong></div></td>
-            <td><strong class="text-primary">Rs.${p.price}</strong></td>
-            <td><span class="${p.stock < 10 ? 'text-danger font-bold' : ''}">${p.stock} Units</span></td>
-            <td><button class="btn btn-success text-sm" onclick="restockProduct(${p.id}, 50)"><i class="fas fa-plus"></i> Restock +50</button></td>
+            <td data-label="Product Info"><div style="display:flex; align-items:center; gap:0.5rem;"><span style="font-size: 1.5rem;">${p.img}</span> <strong>${p.name}</strong></div></td>
+            <td data-label="Price"><strong class="text-primary">Rs.${p.price}</strong></td>
+            <td data-label="Stock/Reqs"><span class="${p.stock < 10 ? 'text-danger font-bold' : ''}">${p.stock} Units</span></td>
+            <td data-label="Action"><button class="btn btn-success text-sm" onclick="restockProduct(${p.id}, 50)"><i class="fas fa-plus"></i> Restock +50</button></td>
         </tr>`).join('');
 
     // Tabbed Order Queue
@@ -1242,20 +1242,20 @@ function renderSoldProducts(soldList) {
     const today = new Date().toLocaleDateString();
     document.getElementById('soldProductsTable').innerHTML = soldList.filter(s => new Date(s.date).toLocaleDateString() === today).map(s => `
         <tr>
-            <td>${s.productName}</td>
-            <td class="font-bold">${s.quantitySold}</td>
-            <td class="text-success font-bold">₹${s.revenue}</td>
+            <td data-label="Product Name">${s.productName}</td>
+            <td data-label="Quantity Sold" class="font-bold">${s.quantitySold}</td>
+            <td data-label="Daily Revenue" class="text-success font-bold">₹${s.revenue}</td>
         </tr>`).join('');
 }
 
 function renderRedeemTransactions(redeems) {
     const today = new Date().toLocaleDateString();
-    document.getElementById('redeemTransactionsTable').innerHTML = redeems.filter(r => new Date(r.date).toLocaleDateString() === today).map(r => `
+    document.getElementById('redeemTransactionsTable').innerHTML = redeems.filter(r => r.date && new Date(r.date).toLocaleDateString() === today).map(r => `
         <tr>
-            <td>${r.orderId}</td>
-            <td>${r.userName}</td>
-            <td class="text-success font-bold">-₹${r.discountAmount}</td>
-            <td class="font-bold">₹${r.finalPrice}</td>
+            <td data-label="Order ID">${r.orderId}</td>
+            <td data-label="User">${r.userName}</td>
+            <td data-label="Discount" class="text-success font-bold">-₹${r.discountAmount}</td>
+            <td data-label="Final Price" class="font-bold">₹${r.finalPrice}</td>
         </tr>`).join('');
 }
 
