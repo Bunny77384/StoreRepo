@@ -1128,7 +1128,9 @@ function updateStudentDashboard() {
                             <span class="badge-status bg-${order.status} ml-2">${order.status}</span>
                         </h4>
                         <p class="text-sm text-muted mb-1"><i class="far fa-clock"></i> ${order.date} • <i class="fas fa-map-marker-alt"></i> Slot: ${order.slot}</p>
-                        <p class="text-sm font-bold mt-1" style="color:var(--primary);">${order.items.length} unique bundles assigned</p>
+                        <div class="mt-1" style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+                            ${order.items.map(i => `<span class="badge-status" style="background:#EEF2FF; color:var(--primary); border:1px solid #C7D2FE;">${i.name} x${i.qty}</span>`).join('')}
+                        </div>
                     </div>
                     <div class="text-right">
                         <p class="font-bold text-primary" style="font-size:1.5rem;">₹${order.total}</p>
@@ -1186,11 +1188,20 @@ function updateAdminDashboard() {
                 <span class="text-primary font-bold">#${o.id}</span>
                 <span class="text-sm text-muted">${o.status === 'Completed' && o.completionDate ? `<i class="fas fa-check-circle"></i> ${new Date(o.completionDate).toLocaleString()}` : o.date}</span>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                  <div>
                     <p><strong>Student:</strong> ${o.userName} (${o.usn})</p>
                     <p><strong>Slot:</strong> ${o.slot}</p>
-                    <strong class="text-primary">Rs.${o.total}</strong>
+                    <div style="margin-top:0.5rem; background:var(--bg-light); border-radius:4px; padding:0.5rem;">
+                        <strong class="text-xs text-muted" style="text-transform:uppercase; display:block; margin-bottom:0.25rem;">Items Ordered:</strong>
+                        ${o.items.map(item => `
+                            <div class="text-sm font-bold" style="display:flex; justify-content:space-between; gap:2rem;">
+                                <span>${item.name}</span>
+                                <span class="text-primary">x${item.qty}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <strong class="text-primary" style="display:block; margin-top:0.5rem; font-size:1.1rem;">Total: Rs.${o.total}</strong>
                  </div>
                  <div style="text-align:right;">
                     ${o.status === 'Cancelled' ? '<span class="badge-status bg-Cancelled">Cancelled</span>' : 
