@@ -64,7 +64,10 @@ const PrintSchema = new mongoose.Schema({
     copies: String,
     format: String,
     status: String,
-    date: String
+    date: String,
+    price: Number,
+    fileData: String,
+    orderId: String
 });
 const PrintRequest = mongoose.model('PrintRequest', PrintSchema);
 

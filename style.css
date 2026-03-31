@@ -1056,6 +1056,34 @@ body {
     pointer-events: none;
 }
 
+/* Ping/Highlight for Updated Orders */
+.ping-highlight {
+    animation: pulse-orange 2s infinite;
+    border: 2px solid var(--accent) !important;
+    position: relative;
+}
+
+.ping-highlight::after {
+    content: 'UPDATED';
+    position: absolute;
+    top: -10px;
+    right: 10px;
+    background: var(--accent);
+    color: white;
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 800;
+    z-index: 10;
+}
+
+@keyframes pulse-orange {
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+/* --- RESPONSIVE DESIGN --- */
 /* Sidebar Cart */
 .cart-sidebar {
     position: fixed;

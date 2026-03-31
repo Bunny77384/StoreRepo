@@ -334,17 +334,25 @@
                     </div>
                 </div>
 
-                <div class="section-container" style="margin-top:2rem;">
-                    <h2 class="section-title"><i class="fas fa-stream text-primary"></i> Order Tracking Hub</h2>
-                    <div class="admin-tabs">
-                        <button class="admin-tab active" id="tab-Active" onclick="switchAdminOrderTab('Active')">Active
-                            Orders</button>
-                        <button class="admin-tab" id="tab-Completed"
-                            onclick="switchAdminOrderTab('Completed')">Completed</button>
-                        <button class="admin-tab" id="tab-Cancelled"
-                            onclick="switchAdminOrderTab('Cancelled')">Cancelled</button>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap:2.5rem; margin-top:2rem;">
+                    <div class="section-container" style="margin-bottom:0;">
+                        <h2 class="section-title"><i class="fas fa-stream text-primary"></i> Order Tracking Hub</h2>
+                        <div class="admin-tabs">
+                            <button class="admin-tab active" id="tab-Active" onclick="switchAdminOrderTab('Active')">Active</button>
+                            <button class="admin-tab" id="tab-Completed" onclick="switchAdminOrderTab('Completed')">Completed</button>
+                            <button class="admin-tab" id="tab-Cancelled" onclick="switchAdminOrderTab('Cancelled')">Cancelled</button>
+                        </div>
+                        <div id="adminOrderQueue" style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;"></div>
                     </div>
-                    <div id="adminOrderQueue" style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
+
+                    <div class="section-container" style="margin-bottom:0;">
+                        <h2 class="section-title"><i class="fas fa-print text-primary"></i> Print/Xerox Queue</h2>
+                        <div class="admin-tabs">
+                            <button class="admin-tab active" id="tab-Print-Active" onclick="switchAdminPrintTab('Active')">Active</button>
+                            <button class="admin-tab" id="tab-Print-Completed" onclick="switchAdminPrintTab('Completed')">Completed</button>
+                            <button class="admin-tab" id="tab-Print-Cancelled" onclick="switchAdminPrintTab('Cancelled')">Cancelled</button>
+                        </div>
+                        <div id="adminPrintQueue" style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;"></div>
                     </div>
                 </div>
 
@@ -399,10 +407,7 @@
                 </div>
 
 
-                <div class="section-container">
-                    <h2 class="section-title"><i class="fas fa-print text-primary"></i> Print/Xerox Requests Queue</h2>
-                    <div id="adminPrintQueue" style="display:flex; flex-direction:column; gap:1rem;"></div>
-                </div>
+
             </section>
 
         </main>

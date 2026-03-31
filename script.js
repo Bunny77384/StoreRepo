@@ -566,18 +566,24 @@ function updateCartUI() {
     let total = 0, count = 0;
 
     cartItemsEl.innerHTML = cart.map((item, index) => {
-        total += item.price * item.qty; count += item.qty;
+        total += item.price * item.qty; count += 1; // Count items, not total units for clarity
+        const isPrint = item.isPrint;
         return `
-            <div class="cart-item">
-                <div class="cart-item-img">${item.img}</div>
+            <div class="cart-item" style="${isPrint ? 'border-left: 4px solid var(--primary);' : ''}">
+                <div class="cart-item-img">${isPrint ? '<i class="fas fa-print"></i>' : item.img}</div>
                 <div class="cart-item-details">
                     <p class="cart-item-title">${item.name}</p>
+                    ${isPrint ? `<p class="text-xs text-muted mb-1">${item.pages} pgs, ${item.copies} copies, ${item.format}</p>` : ''}
                     <p class="text-primary font-bold">₹${item.price}</p>
                     <div class="cart-item-qty">
-                        <button class="qty-btn" onclick="updateQty(${index}, -1)">-</button>
-                        <span style="width: 20px; text-align:center;">${item.qty}</span>
-                        <button class="qty-btn" onclick="updateQty(${index}, 1)">+</button>
-                        <button class="btn btn-icon ml-2 text-danger" onclick="cart.splice(${index}, 1); updateCartUI();"><i class="fas fa-trash-alt"></i></button>
+                        ${!isPrint ? `
+                            <button class="qty-btn" onclick="updateQty(${index}, -1)">-</button>
+                            <span style="width: 20px; text-align:center;">${item.qty}</span>
+                            <button class="qty-btn" onclick="updateQty(${index}, 1)">+</button>
+                        ` : `
+                            <span class="text-sm text-muted">Fixed Print Task</span>
+                        `}
+                        <button class="btn btn-icon ml-auto text-danger" onclick="cart.splice(${index}, 1); updateCartUI();"><i class="fas fa-trash-alt"></i></button>
                     </div>
                 </div>
             </div>
@@ -677,17 +683,30 @@ function processPayment(event) {
     const newOrder = {
         id: orderId, userId: currentUser.email, userName: currentUser.name, usn: currentUser.usn,
         items: [...cart], total, date: new Date().toLocaleString(), slot: timeSlot, points: pointsEarned,
-        status: 'Placed', redeemedPoints: isRedeeming
+        status: 'Placed', redeemedPoints: isRedeeming,
+        hasPrint: cart.some(i => i.isPrint)
     };
 
     globalOrders.push(newOrder);
     
+    // Save Order and potentially split out Print Requests
     fetch(`${API_URL}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newOrder)
     }).then(res => res.json()).then(d => {
-        if(d.success) fetchProductsFromDB(); // SYNC STOCK IMMEDIATELY
+        if(d.success) {
+            fetchProductsFromDB(); 
+            // Save Prints automatically if they exist in the order
+            cart.filter(i => i.isPrint).forEach(pr => {
+                const printObj = { ...pr, id: `${orderId}-P`, userId: currentUser.email, orderId: orderId, status: 'Placed', date: new Date().toLocaleDateString() };
+                fetch(`${API_URL}/api/prints`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(printObj)
+                }).then(() => refreshPrintsDatabase());
+            });
+        }
     }).catch(e => console.error(e));
 
     currentUser.points += pointsEarned;
@@ -836,6 +855,7 @@ function processReorderFlex(orderId, newTotal) {
 
     order.items = [...tempReorderCart];
     order.total = newTotal;
+    order.modified = true; // Flag for admin highlighting
     
     localStorage.setItem('StoreCurrentUser', JSON.stringify(currentUser));
     fetch(`${API_URL}/api/orders/${orderId}`, {
@@ -844,6 +864,7 @@ function processReorderFlex(orderId, newTotal) {
         body: JSON.stringify(order)
     }).catch(e => console.error(e));
 
+    pushSystemNotification('admin@college.edu', 'Order Updated', `Critical: ${currentUser.name} modified Order #${orderId} remotely.`);
     updateStudentDashboard();
     renderCatalog(products);
     closeAllModals();
@@ -1147,7 +1168,6 @@ function updateAdminDashboard() {
     const todayStr = new Date().toLocaleDateString();
     
     // Today's Sales: Include all non-cancelled orders placed today
-    // Robust check: Compare only the date portion (before the comma/time)
     let dailyOrders = globalOrders.filter(o => {
         if (!o.date || o.status === 'Cancelled') return false;
         const oDatePart = o.date.split(',')[0].trim();
@@ -1157,9 +1177,9 @@ function updateAdminDashboard() {
 
     const todaySales = dailyOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
 
-    // Lifetime Revenue: Sum of all COMPLETED orders ever
-    const completedOrders = globalOrders.filter(o => o.status?.toLowerCase() === 'completed');
-    const lifetimeRevenue = completedOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    // Lifetime Revenue: Sum of ALL non-cancelled orders ever
+    const allValidOrders = globalOrders.filter(o => o.status !== 'Cancelled');
+    const lifetimeRevenue = allValidOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
     
     document.getElementById('adminTotalSales').textContent = todaySales;
     document.getElementById('adminLifetimeRev').textContent = lifetimeRevenue;
@@ -1183,7 +1203,7 @@ function updateAdminDashboard() {
     });
 
     document.getElementById('adminOrderQueue').innerHTML = queueToDisplay.slice().reverse().map(o => `
-        <div class="card p-1" style="border-left: 4px solid ${o.status === 'Cancelled' ? '#EF4444' : (o.status === 'Completed' ? '#10B981' : 'var(--primary)')};">
+        <div class="card p-1 ${o.modified ? 'ping-highlight' : ''}" style="border-left: 4px solid ${o.status === 'Cancelled' ? '#EF4444' : (o.status === 'Completed' ? '#10B981' : 'var(--primary)')};">
             <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
                 <span class="text-primary font-bold">#${o.id}</span>
                 <span class="text-sm text-muted">${o.status === 'Completed' && o.completionDate ? `<i class="fas fa-check-circle"></i> ${new Date(o.completionDate).toLocaleString()}` : o.date}</span>
@@ -1218,22 +1238,38 @@ function updateAdminDashboard() {
         </div>
     `).join('') || `<div class="text-center text-muted p-2">No ${adminActiveTab} orders found.</div>`;
 
-    document.getElementById('adminPrintQueue').innerHTML = printRequests.slice().reverse().map(r => `
-        <div class="card p-1" style="border-left: 4px solid var(--primary);">
+    // Tabbed Print Queue
+    const printQueueToDisplay = printRequests.filter(r => {
+        if (adminPrintActiveTab === 'Active') return r.status !== 'Completed' && r.status !== 'Cancelled';
+        return r.status === adminPrintActiveTab;
+    });
+
+    document.getElementById('adminPrintQueue').innerHTML = printQueueToDisplay.slice().reverse().map(r => `
+        <div class="card p-1" style="border-left: 4px solid var(--accent);">
             <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
-                <span class="text-primary font-bold">#${r.id}</span>
+                <span class="text-warning font-bold">#${r.id}</span>
                 <span class="text-sm text-muted">${r.date}</span>
             </div>
-            <p><strong>File:</strong> ${r.fileName}</p>
-            <p><strong>Config:</strong> Pages ${r.pages}, ${r.copies} Copies | Format: <strong>${r.format}</strong></p>
-            <div style="text-align:right; margin-top:0.5rem;">
-                ${r.status === 'Ready' || r.status === 'Completed' ?
-                    `<span class="badge-status bg-Ready">${r.status}</span>` :
-                    `<button class="btn btn-success text-sm" onclick="markPrintReady('${r.id}')"><i class="fas fa-check"></i> Mark Ready</button>`
+            <p><strong>User:</strong> ${r.userId.split('@')[0]}</p>
+            <p><strong>File:</strong> 
+                ${r.fileData ? 
+                    `<a href="${r.fileData}" download="${r.fileName}" class="text-primary font-bold"><i class="fas fa-file-pdf"></i> Download & Print Attachment</a>` : 
+                    `<span class="text-muted"><i class="fas fa-unlink"></i> File Lost or Legacy</span>`
                 }
+            </p>
+            <p><strong>Price Paid:</strong> <strong class="text-success">₹${r.price || 0}</strong></p>
+            <p><strong>Config:</strong> ${r.pages} Pages, ${r.copies} Copies | <strong>${r.format}</strong></p>
+            <div style="text-align:right; margin-top:0.75rem;">
+                <select class="admin-select bg-${r.status}" onchange="updateAdminPrintStatus('${r.id}', this.value)">
+                    <option value="Placed" ${r.status === 'Placed' ? 'selected' : ''}>Placed</option>
+                    <option value="Accepted" ${r.status === 'Accepted' ? 'selected' : ''}>Accepted</option>
+                    <option value="Ready" ${r.status === 'Ready' ? 'selected' : ''}>Ready</option>
+                    <option value="Completed" ${r.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                    <option value="Cancelled" ${r.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                </select>
             </div>
         </div>
-    `).join('') || `<div class="text-center text-muted p-2">No print requests found.</div>`;
+    `).join('') || `<div class="text-center text-muted p-2">No ${adminPrintActiveTab} requests.</div>`;
 }
 
 async function refreshAdminAnalytics() {
@@ -1247,14 +1283,6 @@ async function refreshAdminAnalytics() {
     } catch(err) {}
 }
 
-function switchAdminOrderTab(tab) {
-    adminActiveTab = tab;
-    document.querySelectorAll('.admin-tab').forEach(t => {
-        t.classList.remove('active');
-        if (t.id === `tab-${tab}`) t.classList.add('active');
-    });
-    updateAdminDashboard();
-}
 
 function renderSoldProducts(soldList) {
     const today = new Date().toLocaleDateString();
@@ -1299,50 +1327,62 @@ function downloadReport(type) {
 function handlePrintRequest(e) {
     e.preventDefault();
     const fileInput = document.getElementById('printFile');
-    const pages = document.getElementById('printPages').value;
-    const copies = document.getElementById('printCopies').value;
+    const pagesRange = document.getElementById('printPages').value;
+    const copies = parseInt(document.getElementById('printCopies').value);
     const format = document.getElementById('printFormatType').value;
 
     if (!fileInput.files[0]) return;
-    const fileName = fileInput.files[0].name;
-    const reqId = getGenerateOrderId(currentUser.usn);
+    const file = fileInput.files[0];
+    const fileName = file.name;
+    
+    // Read file as Base64 for actual opening by Admin later
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const fileData = event.target.result;
+        
+        let pageCount = pagesRange.toLowerCase() === 'all' ? 10 : (pagesRange.split('-').length > 1 ? parseInt(pagesRange.split('-')[1]) - parseInt(pagesRange.split('-')[0]) + 1 : 1);
+        let unitPrice = format.includes('Double Side') ? 4 : (format.includes('per page') ? 3 : 5);
+        let totalPrice = pageCount * unitPrice * copies;
 
-    const reqObj = {
-        id: reqId, userId: currentUser.email, fileName, pages, copies, format,
-        status: 'Submitted', date: new Date().toLocaleDateString()
+        const printItem = {
+            name: `Print: ${fileName}`,
+            price: totalPrice,
+            qty: 1,
+            isPrint: true,
+            fileName,
+            fileData, // Actual Base64 content
+            pages: pagesRange,
+            copies,
+            format,
+            isBundle: false
+        };
+
+        cart.push(printItem);
+        updateCartUI();
+        document.getElementById('printForm').reset();
+        showToast(`Print Task added to cart (₹${totalPrice})`, "success");
+        toggleCart();
     };
-    printRequests.push(reqObj);
-
-    fetch(`${API_URL}/api/prints`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reqObj)
-    }).catch(e=>console.error(e));
-
-    document.getElementById('printForm').reset();
-    showToast(`Print Ticket ${reqId} Submitted Successfully!`, "success");
-    updatePrintUI();
-    pushSystemNotification('admin@college.edu', 'New Print Request', `Student uploaded ${fileName} for printing Ticket ${reqId}.`);
-    updateAdminDashboard();
+    reader.readAsDataURL(file);
 }
 
 function pushStandardEval(bundleName, pageCount) {
-    const reqId = getGenerateOrderId(currentUser.usn);
-    const reqObj = {
-        id: reqId, userId: currentUser.email, fileName: `System Gen: ${bundleName}`, pages: `1-${pageCount}`, copies: 1, format: "Double Side",
-        status: 'Submitted', date: new Date().toLocaleDateString()
+    const printItem = {
+        name: `Eval: ${bundleName}`,
+        price: pageCount * 4, // Double side standard rate
+        qty: 1,
+        isPrint: true,
+        fileName: `${bundleName}.pdf`,
+        pages: `1-${pageCount}`,
+        copies: 1,
+        format: "Double Side",
+        isBundle: false
     };
-    printRequests.push(reqObj);
 
-    fetch(`${API_URL}/api/prints`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reqObj)
-    }).catch(e=>console.error(e));
-    showToast(`System Print Ticket ${reqId} dispatched directly to Admin!`, "success");
-    updatePrintUI();
-    pushSystemNotification('admin@college.edu', 'System Eval Print', `Student auto-requested ${bundleName} via Ticket ${reqId}.`);
-    updateAdminDashboard();
+    cart.push(printItem);
+    updateCartUI();
+    showToast(`${bundleName} added to cart`, "success");
+    toggleCart();
 }
 
 function updatePrintUI() {
@@ -1367,19 +1407,27 @@ function updatePrintUI() {
     `).join('');
 }
 
-function markPrintReady(reqId) {
+function updateAdminPrintStatus(reqId, newStatus) {
     let req = printRequests.find(r => r.id === reqId);
-    if (req) {
-        req.status = 'Ready';
-        fetch(`${API_URL}/api/prints/${reqId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(req)
-        }).catch(e=>console.error(e));
-        pushSystemNotification(req.userId, `Print Request Ready!`, `Your document ${req.fileName} is printed and ready for pickup.`);
-        updateAdminDashboard();
-        showToast("Print request marked ready.", "success");
+    if (!req) return;
+
+    req.status = newStatus;
+    fetch(`${API_URL}/api/prints/${reqId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req)
+    }).catch(e=>console.error(e));
+
+    if (newStatus === 'Accepted') {
+        pushSystemNotification(req.userId, `Print Request Accepted`, `Your document ${req.fileName} has been queued for printing.`);
+    } else if (newStatus === 'Ready') {
+        pushSystemNotification(req.userId, `Print Document Ready!`, `Your print task #${reqId} is complete and ready for pickup.`);
+    } else if (newStatus === 'Completed') {
+        pushSystemNotification(req.userId, `Print Project Handed Over`, `Task #${reqId} has been successfully collected.`);
     }
+
+    updateAdminDashboard();
+    showToast(`Print Request #${reqId} moved to ${newStatus}`, "success");
 }
 
 function showToast(message, type = 'success') {
