@@ -9,6 +9,28 @@ const API_URL = isLocal
 
 let products = []; // Fetched from Database now for True Sync
 let adminActiveTab = 'Active';
+let adminPrintActiveTab = 'Active';
+
+function switchAdminOrderTab(tab) {
+    adminActiveTab = tab;
+    // Update tab UI state
+    document.querySelectorAll('.admin-tab[id^="tab-"]').forEach(btn => {
+        if (!btn.id.startsWith('tab-Print-')) btn.classList.remove('active');
+    });
+    const activeBtn = document.getElementById(`tab-${tab}`);
+    if (activeBtn) activeBtn.classList.add('active');
+    updateAdminDashboard();
+}
+
+function switchAdminPrintTab(tab) {
+    adminPrintActiveTab = tab;
+    // Update tab UI state for prints
+    document.querySelectorAll('.admin-tab[id^="tab-Print-"]').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.getElementById(`tab-Print-${tab}`);
+    if (activeBtn) activeBtn.classList.add('active');
+    updateAdminDashboard();
+}
+
 
 async function fetchProductsFromDB() {
     try {
@@ -1181,11 +1203,11 @@ function updateAdminDashboard() {
     const allValidOrders = globalOrders.filter(o => o.status !== 'Cancelled');
     const lifetimeRevenue = allValidOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
     
-    document.getElementById('adminTotalSales').textContent = todaySales;
-    document.getElementById('adminLifetimeRev').textContent = lifetimeRevenue;
-    document.getElementById('adminTotalOrders').textContent = globalOrders.filter(o => o.status === 'Placed' || o.status === 'Accepted').length;
-    document.getElementById('adminPendingReqs').textContent = notifyRequests.length;
-    document.getElementById('adminNotifsSent').textContent = adminNotifsSentCounter;
+    document.getElementById('adminTotalSales').textContent = Number(todaySales || 0).toLocaleString();
+    document.getElementById('adminLifetimeRev').textContent = Number(lifetimeRevenue || 0).toLocaleString();
+    document.getElementById('adminTotalOrders').textContent = (globalOrders || []).filter(o => o.status === 'Placed' || o.status === 'Accepted').length;
+    document.getElementById('adminPendingReqs').textContent = (notifyRequests || []).length;
+    document.getElementById('adminNotifsSent').textContent = adminNotifsSentCounter || 0;
 
     // Inventory Sync Table
     document.getElementById('inventoryTable').innerHTML = products.map(p => `
@@ -1214,7 +1236,7 @@ function updateAdminDashboard() {
                     <p><strong>Slot:</strong> ${o.slot}</p>
                     <div style="margin-top:0.5rem; background:var(--bg-light); border-radius:4px; padding:0.5rem;">
                         <strong class="text-xs text-muted" style="text-transform:uppercase; display:block; margin-bottom:0.25rem;">Items Ordered:</strong>
-                        ${o.items.map(item => `
+                        ${(o.items || []).map(item => `
                             <div class="text-sm font-bold" style="display:flex; justify-content:space-between; gap:2rem;">
                                 <span>${item.name}</span>
                                 <span class="text-primary">x${item.qty}</span>
