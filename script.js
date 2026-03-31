@@ -39,7 +39,10 @@ async function fetchProductsFromDB() {
             products = await response.json();
             // Re-sync UI with new DB state while RESPECTING active filters
             if (currentUser) {
-                if (currentUser.role === 'student') filterProducts(); 
+                if (currentUser.role === 'student') {
+                    filterProducts();
+                    updatePrintUI();
+                }
                 if (currentUser.role === 'admin') updateAdminDashboard();
             }
         }
@@ -281,12 +284,9 @@ async function refreshPrintsDatabase() {
     try {
         const response = await fetch(`${API_URL}/api/prints`);
         if (response.ok) {
-            const fetched = await response.json();
-            if (JSON.stringify(fetched) !== JSON.stringify(printRequests)) {
-                printRequests = fetched;
-                if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
-                if (currentUser && currentUser.role === 'student') updatePrintUI();
-            }
+            printRequests = await response.json();
+            if (currentUser && currentUser.role === 'student') updatePrintUI();
+            if (currentUser && currentUser.role === 'admin') updateAdminDashboard();
         }
     } catch(err) {}
 }
@@ -614,6 +614,7 @@ function updateCartUI() {
 
     cartCountEl.textContent = count;
     cartTotalEl.textContent = total;
+    updatePrintUI();
 }
 
 function updateQty(index, delta) {
@@ -1362,9 +1363,27 @@ function handlePrintRequest(e) {
     reader.onload = function(event) {
         const fileData = event.target.result;
         
-        let pageCount = pagesRange.toLowerCase() === 'all' ? 10 : (pagesRange.split('-').length > 1 ? parseInt(pagesRange.split('-')[1]) - parseInt(pagesRange.split('-')[0]) + 1 : 1);
-        let unitPrice = format.includes('Double Side') ? 4 : (format.includes('per page') ? 3 : 5);
-        let totalPrice = pageCount * unitPrice * copies;
+        // Correct Mathematical Formula for Print Pricing:
+        // Rule: ₹1 per side printed.
+        // N = Pages Per Sheet (1, 2, or 4).
+        // Total Sides = ceil(Page Count / N).
+        // Price = Total Sides * Copies * 1.
+        
+        let N = 1;
+        if (format.includes("2 per page")) N = 2;
+        if (format.includes("4 per page")) N = 4;
+
+        let pageCount = 1;
+        if (pagesRange.toLowerCase() === 'all') {
+            pageCount = 10; // Default estimate for 'all' in demo
+        } else if (pagesRange.split('-').length > 1) {
+            pageCount = parseInt(pagesRange.split('-')[1]) - parseInt(pagesRange.split('-')[0]) + 1;
+        } else {
+            pageCount = parseInt(pagesRange) || 1;
+        }
+
+        let totalSides = Math.ceil(pageCount / N);
+        let totalPrice = totalSides * copies * 1;
 
         const printItem = {
             name: `Print: ${fileName}`,
@@ -1372,7 +1391,7 @@ function handlePrintRequest(e) {
             qty: 1,
             isPrint: true,
             fileName,
-            fileData, // Actual Base64 content
+            fileData,
             pages: pagesRange,
             copies,
             format,
@@ -1391,7 +1410,7 @@ function handlePrintRequest(e) {
 function pushStandardEval(bundleName, pageCount) {
     const printItem = {
         name: `Eval: ${bundleName}`,
-        price: pageCount * 4, // Double side standard rate
+        price: Math.ceil(pageCount / 1) * 1, // Standard evaluation copy pricing (1 side per page)
         qty: 1,
         isPrint: true,
         fileName: `${bundleName}.pdf`,
@@ -1421,12 +1440,29 @@ function updatePrintUI() {
             <div>
                 <strong class="text-primary">${r.id}</strong> - ${r.fileName}
                 <div class="text-sm text-muted mt-1">Pages: ${r.pages} | Copies: ${r.copies} | Format: <strong>${r.format}</strong></div>
+                <div class="text-sm font-bold text-success mt-1">Paid: ₹${r.price || 0}</div>
             </div>
             <div>
-                <span class="badge-status bg-${r.status === 'Submitted' ? 'Placed' : 'Ready'}">${r.status}</span>
+                <span class="badge-status bg-${r.status}">${r.status}</span>
             </div>
         </div>
     `).join('');
+
+    // Also show items currently in cart but not yet paid (placed)
+    const cartPrints = cart.filter(i => i.isPrint);
+    if (cartPrints.length > 0) {
+        list.innerHTML += `
+            <div style="margin-top:1.5rem; border-top: 1px dashed var(--border); padding-top:1rem;">
+                <h4 class="text-sm text-muted mb-1"><i class="fas fa-shopping-cart"></i> Pending in Cart (Unpaid)</h4>
+                ${cartPrints.map(cp => `
+                    <div style="background:rgba(var(--primary-rgb), 0.05); border:1px dashed var(--primary); padding:0.75rem; border-radius:var(--radius-md); margin-bottom:0.5rem; font-size:0.85rem;">
+                        <strong>${cp.name}</strong> - ₹${cp.price} (Pay at checkout)
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
 }
 
 function updateAdminPrintStatus(reqId, newStatus) {
