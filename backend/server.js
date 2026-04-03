@@ -12,9 +12,20 @@ app.use(cors({
 }));
 
 // MongoDB Atlas Connection
-mongoose.connect(process.env.DATABASE_URI)
-    .then(() => console.log("✅ Securely connected!"))
-    .catch(err => console.error("❌ Database connection failed:", err));
+if (!process.env.DATABASE_URI) {
+    console.error("❌ CRITICAL: DATABASE_URI is missing from .env file!");
+} else {
+    console.log("📡 Attempting to connect to MongoDB Atlas...");
+    mongoose.connect(process.env.DATABASE_URI, {
+        serverSelectionTimeoutMS: 5000 // Fast fail for easier debugging
+    })
+    .then(() => console.log("✅ Securely connected to MongoDB Atlas!"))
+    .catch(err => {
+        console.error("❌ Database connection failed!");
+        console.error("👉 Please ensure your IP is whitelisted in MongoDB Atlas (Network Access).");
+        console.error("👉 Actual Error:", err.message);
+    });
+}
 
 // MongoDB Schema Definitions
 const UserSchema = new mongoose.Schema({
