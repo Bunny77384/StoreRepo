@@ -1208,11 +1208,11 @@ function updateAdminDashboard() {
     const todaySales = dailyOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
 
     // Lifetime Revenue: Sum of ALL non-cancelled orders ever
-    const allValidOrders = globalOrders.filter(o => o.status !== 'Cancelled');
-    const lifetimeRevenue = allValidOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const allValidOrders = (globalOrders || []).filter(o => o.status !== 'Cancelled');
+    const lifetimeRevenue = allValidOrders.reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0);
     
-    document.getElementById('adminTotalSales').textContent = Number(todaySales || 0).toLocaleString();
-    document.getElementById('adminLifetimeRev').textContent = Number(lifetimeRevenue || 0).toLocaleString();
+    document.getElementById('adminTotalSales').textContent = parseFloat(todaySales || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    document.getElementById('adminLifetimeRev').textContent = parseFloat(lifetimeRevenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
     document.getElementById('adminTotalOrders').textContent = (globalOrders || []).filter(o => o.status === 'Placed' || o.status === 'Accepted').length;
     document.getElementById('adminPendingReqs').textContent = (notifyRequests || []).length;
     document.getElementById('adminNotifsSent').textContent = adminNotifsSentCounter || 0;
@@ -1283,7 +1283,10 @@ function updateAdminDashboard() {
             <p><strong>User:</strong> ${r.userId.split('@')[0]}</p>
             <p><strong>File:</strong> 
                 ${r.fileData ? 
-                    `<a href="${r.fileData}" download="${r.fileName}" class="text-primary font-bold"><i class="fas fa-file-pdf"></i> Download & Print Attachment</a>` : 
+                    `<div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+                        <a href="${r.fileData}" download="${r.fileName}" class="btn btn-outline text-xs"><i class="fas fa-download"></i> Download</a>
+                        <button onclick="viewPrintDoc('${r.id}')" class="btn btn-primary text-xs"><i class="fas fa-eye"></i> View & Print</button>
+                    </div>` : 
                     `<span class="text-muted"><i class="fas fa-unlink"></i> File Lost or Legacy</span>`
                 }
             </p>
@@ -1309,8 +1312,21 @@ async function refreshAdminAnalytics() {
             const data = await response.json();
             renderSoldProducts(data.sold);
             renderRedeemTransactions(data.redeems);
+            
+            // If lifetime revenue is zero in current orders, fallback to analytics total
+            const revEl = document.getElementById('adminLifetimeRev');
+            if (revEl.textContent === "0" || revEl.textContent === "0.00") {
+                revEl.textContent = parseFloat(data.totalSales || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            }
         }
     } catch(err) {}
+}
+
+function viewPrintDoc(id) {
+    const r = printRequests.find(req => req.id === id);
+    if (!r || !r.fileData) return;
+    const win = window.open();
+    win.document.write('<iframe src="' + r.fileData + '" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>');
 }
 
 
@@ -1350,8 +1366,25 @@ async function restockProduct(id, amount) {
     } catch(err) { showToast("Restock sync failed", "error"); }
 }
 
-function downloadReport(type) {
-    window.location.href = `${API_URL}/api/admin/reports/${type}`;
+async function downloadReport(type) {
+    try {
+        showToast(`Generating ${type.toUpperCase()}...`, "info");
+        const res = await fetch(`${API_URL}/api/admin/reports/${type}`);
+        if (!res.ok) throw new Error("Server error");
+        
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `orders_audit_report_${new Date().toISOString().split('T')[0]}.${type}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        showToast("Report downloaded successfully!", "success");
+    } catch(e) {
+        showToast("Report generation failed!", "error");
+    }
 }
 
 function calculatePrintCost() {

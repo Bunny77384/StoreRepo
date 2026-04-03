@@ -187,7 +187,7 @@ async function trackSale(item, orderDate) {
         { productId, date: { $gte: new Date().setHours(0,0,0,0) } }, // Daily tracking
         { 
             $inc: { quantitySold: qty, revenue: revenue },
-            $setOnInsert: { productName: item.name, productId }
+            $setOnInsert: { productName: item.name, productId, date: new Date() }
         },
         { upsert: true, new: true }
     );
@@ -415,6 +415,7 @@ app.get('/api/admin/reports/pdf', async (req, res) => {
         const completedOrders = await Order.find({ status: 'Completed' }).select('-items');
         const doc = new PDFDocument({ margin: 30 });
         res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=completed_orders_audit.pdf');
         doc.pipe(res);
 
         doc.fontSize(22).text('Completed Orders Audit Report', { align: 'center' });
