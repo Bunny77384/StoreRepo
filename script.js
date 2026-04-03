@@ -1253,8 +1253,11 @@ function updateAdminDashboard() {
             <td data-label="Action"><button class="btn btn-success text-sm" onclick="restockProduct(${p.id}, 50)"><i class="fas fa-plus"></i> Restock +50</button></td>
         </tr>`).join('');
 
-    // Tabbed Order Queue
+    // Tabbed Order Queue: EXCLUDE orders that are ONLY prints (they stay in Print Queue)
     let queueToDisplay = globalOrders.filter(o => {
+        const isPurePrint = (o.items || []).every(item => item.isPrint);
+        if (isPurePrint) return false; 
+        
         if (adminActiveTab === 'Active') return o.status !== 'Completed' && o.status !== 'Cancelled';
         return o.status === adminActiveTab;
     });

@@ -427,41 +427,39 @@ app.get('/api/admin/reports/csv', async (req, res) => {
 app.get('/api/admin/reports/pdf', async (req, res) => {
     try {
         const completedOrders = await Order.find({ status: 'Completed' }).select('-items');
+        const completedPrints = await PrintRequest.find({ status: 'Completed' });
         const doc = new PDFDocument({ margin: 30 });
+        
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', 'attachment; filename=completed_orders_audit.pdf');
         doc.pipe(res);
 
-        doc.fontSize(22).text('Completed Orders Audit Report', { align: 'center' });
+        doc.fontSize(22).text('Daily Master Audit Report', { align: 'center' });
         doc.fontSize(10).text(`Generated on: ${new Date().toLocaleString()}`, { align: 'center' });
         doc.moveDown(2);
 
         const startX = 30;
-        let currentY = doc.y;
-        
         doc.fontSize(10).font('Helvetica-Bold');
-        doc.text('Date Completed', startX, currentY, { width: 120 });
-        doc.text('Order ID', startX + 130, currentY, { width: 80 });
-        doc.text('Orig Amount', startX + 220, currentY, { width: 80 });
-        doc.text('Paid', startX + 310, currentY, { width: 60 });
-        doc.text('Redeem?', startX + 380, currentY, { width: 60 });
-        doc.text('Disc', startX + 450, currentY, { width: 50 });
+        doc.text('Date', startX, doc.y, { width: 120 });
+        doc.text('ID', startX + 130, doc.y, { width: 80 });
+        doc.text('Original', startX + 220, doc.y, { width: 80 });
+        doc.text('Paid', startX + 310, doc.y, { width: 60 });
+        doc.text('Redeem?', startX + 380, doc.y, { width: 60 });
+        doc.text('Disc', startX + 450, doc.y, { width: 50 });
         
         doc.moveDown();
-        doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke();
-        doc.moveDown();
+        doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke().moveDown();
 
         let totalSum = 0;
         doc.font('Helvetica');
+        
+        // Orders Section
         completedOrders.forEach(o => {
             const disc = o.redeemedPoints ? 30 : 0;
             const paid = Number(o.total || 0);
             totalSum += paid;
-            let formattedDate = o.completionDate || o.date;
-            try { 
-                const d = new Date(o.completionDate || o.date);
-                formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-            } catch(e){}
+            let d = new Date(o.completionDate || o.date);
+            let formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 
             if (doc.y > 700) doc.addPage();
             const y = doc.y;
@@ -474,13 +472,39 @@ app.get('/api/admin/reports/pdf', async (req, res) => {
             doc.moveDown();
         });
 
+        // Prints Section
+        if (completedPrints.length > 0) {
+            doc.moveDown().font('Helvetica-Bold').fontSize(12).text('Completed Print Revenue', startX);
+            doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke().moveDown();
+            doc.font('Helvetica').fontSize(10);
+
+            completedPrints.forEach(pr => {
+                const paid = Number(pr.price || 0);
+                totalSum += paid;
+                let d = new Date(pr.date);
+                let formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+
+                if (doc.y > 700) doc.addPage();
+                const y = doc.y;
+                doc.text(formattedDate, startX, y, { width: 120 });
+                doc.text(String(pr.id || 'N/A'), startX + 130, y, { width: 80 });
+                doc.text(`Rs.${paid}`, startX + 220, y, { width: 80 });
+                doc.text(`Rs.${paid}`, startX + 310, y, { width: 60 });
+                doc.text('Print', startX + 380, y, { width: 60 });
+                doc.text('Rs.0', startX + 450, y, { width: 50 });
+                doc.moveDown();
+            });
+        }
+
         doc.moveDown();
-        doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke();
-        doc.moveDown();
-        doc.fontSize(14).font('Helvetica-Bold').text(`GRAND TOTAL SUM: Rs.${totalSum.toFixed(2)}`, { align: 'right' });
+        doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke().moveDown();
+        doc.fontSize(14).font('Helvetica-Bold').text(`GRAND TOTAL REVENUE: Rs.${totalSum.toFixed(2)}`, { align: 'right' });
 
         doc.end();
-    } catch(err) { res.status(500).send("PDF Error"); }
+    } catch(err) { 
+        console.error("PDF Report Error:", err);
+        res.status(500).send("PDF Error"); 
+    }
 });
 
 // Force generate a report for immediate validation
