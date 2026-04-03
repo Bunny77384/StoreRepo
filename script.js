@@ -3,7 +3,7 @@ const isLocal = ['localhost', '127.0.0.1', '::1', ''].includes(window.location.h
                window.location.hostname.startsWith('10.') || 
                window.location.hostname.startsWith('172.');
 
-const API_URL = isLocal 
+const API_URL = (isLocal || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:5000' 
     : 'https://store-api-backend-cic4.onrender.com';
 
@@ -108,6 +108,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('authSection').style.display = 'flex';
         document.getElementById('mainApp').style.display = 'none';
     }
+
+    // Health Check: Verify Backend Sync
+    console.log(`🔍 Checking Sync Connection with ${API_URL}...`);
+    fetch(`${API_URL}/api/products`).then(r => {
+        if(r.ok) console.log("✅ Sync Connection established successfully!");
+        else console.error("❌ Sync Connection failed: Backend returned an error.");
+    }).catch(e => {
+        console.error("❌ Sync Connection CRITICAL ERROR: Backend seems to be OFFLINE. Please run 'node server.js' in the backend directory.");
+        showToast("Backend connection failed! Is the server running?", "error");
+    });
 
     // Dynamic Multi-Tab Polling Sync
     setInterval(() => {
@@ -1200,9 +1210,14 @@ function updateAdminDashboard() {
     // Today's Sales: Include all non-cancelled orders placed today
     let dailyOrders = globalOrders.filter(o => {
         if (!o.date || o.status === 'Cancelled') return false;
-        const oDatePart = o.date.split(',')[0].trim();
-        const tDatePart = todayStr.split(',')[0].trim();
-        return oDatePart === tDatePart;
+        try {
+            const oDate = new Date(o.date).toLocaleDateString();
+            const tDate = new Date().toLocaleDateString();
+            return oDate === tDate;
+        } catch(e) {
+            // Fallback to legacy string split if Date parse fails
+            return o.date.split(',')[0].trim() === todayStr.split(',')[0].trim();
+        }
     });
 
     const todaySales = dailyOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
