@@ -116,39 +116,51 @@ const DailyReportSchema = new mongoose.Schema({
 });
 const DailyReport = mongoose.model('DailyReport', DailyReportSchema);
 
-// Initialize products in DB if empty (One-time migration)
+// Auto-Healing Product Data Fallback
+const fallbackProducts = [
+    { id: 1, name: "Blue Book (60 Pages)", price: 20, category: "Exam", branch: "All", semester: "All", stock: 150, img: "📖" },
+    { id: 2, name: "Pink Book (40 Pages)", price: 20, category: "Exam", branch: "All", semester: "All", stock: 200, img: "📕" },
+    { id: 3, name: "Graph Sheets (10 Pcs)", price: 10, category: "Stationery", branch: "All", semester: "All", stock: 50, img: "📉" },
+    { id: 4, name: "Record Book", price: 80, category: "Lab", branch: "All", semester: "All", stock: 0, img: "📓" },
+    { id: 5, name: "Engineering Drawing Kit", price: 450, category: "Kits", branch: "MECH", semester: "1", stock: 15, img: "📐" },
+    { id: 6, name: "Microprocessor Lab Manual", price: 120, category: "Lab", branch: "CSE", semester: "5", stock: 0, img: "📘" },
+    { id: 7, name: "Scientific Calculator", price: 950, category: "Electronics", branch: "All", semester: "1", stock: 10, img: "🧮" },
+    { id: 8, name: "Blue Ball Pen (Set of 5)", price: 50, category: "Stationery", branch: "All", semester: "All", stock: 100, img: "🖊️" },
+    { id: 9, name: "A4 Project Paper (100 Pcs)", price: 120, category: "Stationery", branch: "All", semester: "All", stock: 80, img: "📄" },
+    { id: 10, name: "DS Lab Manual + Eval Copy", price: 150, category: "Combo", branch: "CSE", semester: "3", stock: 100, img: "📚" },
+    { id: 11, name: "VLSI Lab Manual + Eval Copy", price: 160, category: "Combo", branch: "ECE", semester: "6", stock: 50, img: "📜" },
+    { id: 12, name: "Fluid Mechanics Manual + Eval", price: 140, category: "Combo", branch: "MECH", semester: "4", stock: 40, img: "🛠️" }
+];
+
 async function seedProducts() {
-    const count = await Product.countDocuments();
-    if (count === 0) {
-        const initialProducts = [
-            { id: 1, name: "Blue Book (60 Pages)", price: 20, category: "Exam", branch: "All", semester: "All", stock: 150, img: "📖" },
-            { id: 2, name: "Pink Book (40 Pages)", price: 20, category: "Exam", branch: "All", semester: "All", stock: 200, img: "📕" },
-            { id: 3, name: "Graph Sheets (10 Pcs)", price: 10, category: "Stationery", branch: "All", semester: "All", stock: 50, img: "📉" },
-            { id: 4, name: "Record Book", price: 80, category: "Lab", branch: "All", semester: "All", stock: 0, img: "📓" },
-            { id: 5, name: "Engineering Drawing Kit", price: 450, category: "Kits", branch: "MECH", semester: "1", stock: 15, img: "📐" },
-            { id: 6, name: "Microprocessor Lab Manual", price: 120, category: "Lab", branch: "CSE", semester: "5", stock: 0, img: "📘" },
-            { id: 7, name: "Scientific Calculator", price: 950, category: "Electronics", branch: "All", semester: "1", stock: 10, img: "🧮" },
-            { id: 8, name: "Blue Ball Pen (Set of 5)", price: 50, category: "Stationery", branch: "All", semester: "All", stock: 100, img: "🖊️" },
-            { id: 9, name: "A4 Project Paper (100 Pcs)", price: 120, category: "Stationery", branch: "All", semester: "All", stock: 80, img: "📄" },
-            { id: 10, name: "DS Lab Manual + Eval Copy", price: 150, category: "Combo", branch: "CSE", semester: "3", stock: 100, img: "📚" },
-            { id: 11, name: "VLSI Lab Manual + Eval Copy", price: 160, category: "Combo", branch: "ECE", semester: "6", stock: 50, img: "📜" },
-            { id: 12, name: "Fluid Mechanics Manual + Eval", price: 140, category: "Combo", branch: "MECH", semester: "4", stock: 40, img: "🛠️" }
-        ];
-        await Product.insertMany(initialProducts);
-        console.log("🌱 Products seeded!");
-    }
+    if (mongoose.connection.readyState !== 1) return;
+    try {
+        const count = await Product.countDocuments();
+        if (count === 0) {
+            await Product.insertMany(fallbackProducts);
+            console.log("🌱 Products seeded!");
+        }
+    } catch(e) {}
 }
 seedProducts();
 
 app.get('/api/products', async (req, res) => {
+    // If DB is disconnected or buffering, serve Static Fallback to keep UI alive (Campus Catalog)
+    if (mongoose.connection.readyState !== 1) {
+        console.warn("⚠️ Serving Catalog from Backup (Local Sync Mode)");
+        return res.json(fallbackProducts);
+    }
+    
     try {
-        let prodList = await Product.find({}).sort({ id: 1 });
+        let prodList = await Product.find({}).sort({ id: 1 }).maxTimeMS(2000); // Fast fail if blocked
         if (prodList.length === 0) {
-            await seedProducts(); // Auto-heal if deleted by accident
+            await seedProducts();
             prodList = await Product.find({}).sort({ id: 1 });
         }
         res.json(prodList);
-    } catch (err) { res.status(500).json({ error: "Fetch products failed" }); }
+    } catch (err) { 
+        res.json(fallbackProducts); // Last resort fallback
+    }
 });
 
 app.post('/api/products/restock', async (req, res) => {
