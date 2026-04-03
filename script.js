@@ -673,6 +673,16 @@ function updateCheckoutTotal() {
 }
 
 // ------ ORDER PROCESSING & LOGICKING ------
+function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+}
+
 function getGenerateOrderId(usnText) {
     let date = new Date().getDate().toString().padStart(2, '0');
     let dept = "XX";
@@ -729,6 +739,8 @@ function processPayment(event) {
 
     globalOrders.push(newOrder);
     
+    const printsToSave = cart.filter(i => i.isPrint);
+    
     // Save Order and potentially split out Print Requests
     fetch(`${API_URL}/api/orders`, {
         method: 'POST',
@@ -738,7 +750,7 @@ function processPayment(event) {
         if(d.success) {
             fetchProductsFromDB(); 
             // Save Prints automatically if they exist in the order
-            cart.filter(i => i.isPrint).forEach((pr, index) => {
+            printsToSave.forEach((pr, index) => {
                 const printObj = { ...pr, id: `${orderId}-P${index + 1}`, userId: currentUser.email, orderId: orderId, status: 'Placed', date: new Date().toLocaleDateString() };
                 fetch(`${API_URL}/api/prints`, {
                     method: 'POST',
@@ -1188,7 +1200,7 @@ function updateStudentDashboard() {
                         <h4 style="margin-bottom:0.25rem;">Order #${order.id} 
                             <span class="badge-status bg-${order.status} ml-2">${order.status}</span>
                         </h4>
-                        <p class="text-sm text-muted mb-1"><i class="far fa-clock"></i> ${order.date} • <i class="fas fa-map-marker-alt"></i> Slot: ${order.slot}</p>
+                        <p class="text-sm text-muted mb-1"><i class="far fa-clock"></i> ${formatDate(order.date)} • <i class="fas fa-map-marker-alt"></i> Slot: ${order.slot}</p>
                         <div class="mt-1" style="display:flex; flex-wrap:wrap; gap:0.5rem;">
                             ${order.items.map(i => `<span class="badge-status" style="background:#EEF2FF; color:var(--primary); border:1px solid #C7D2FE;">${i.name} x${i.qty}</span>`).join('')}
                         </div>
@@ -1251,7 +1263,7 @@ function updateAdminDashboard() {
         <div class="card p-1 ${o.modified ? 'ping-highlight' : ''}" style="border-left: 4px solid ${o.status === 'Cancelled' ? '#EF4444' : (o.status === 'Completed' ? '#10B981' : 'var(--primary)')};">
             <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
                 <span class="text-primary font-bold">#${o.id}</span>
-                <span class="text-sm text-muted">${o.status === 'Completed' && o.completionDate ? `<i class="fas fa-check-circle"></i> ${new Date(o.completionDate).toLocaleString()}` : o.date}</span>
+                <span class="text-sm text-muted">${o.status === 'Completed' && o.completionDate ? `<i class="fas fa-check-circle"></i> ${formatDate(o.completionDate)}` : formatDate(o.date)}</span>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                  <div>
@@ -1293,7 +1305,7 @@ function updateAdminDashboard() {
         <div class="card p-1" style="border-left: 4px solid var(--accent);">
             <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
                 <span class="text-warning font-bold">#${r.id}</span>
-                <span class="text-sm text-muted">${r.date}</span>
+                <span class="text-sm text-muted">${formatDate(r.date)}</span>
             </div>
             <p><strong>User:</strong> ${r.userId.split('@')[0]}</p>
             <p><strong>File:</strong> 

@@ -402,7 +402,10 @@ app.get('/api/admin/reports/csv', async (req, res) => {
             const disc = o.redeemedPoints ? 30 : 0;
             totalSum += o.total;
             let formattedDate = o.completionDate || o.date;
-            try { if(o.completionDate) formattedDate = new Date(o.completionDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); } catch(e){}
+            try { 
+                const d = new Date(o.completionDate || o.date);
+                formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            } catch(e){}
 
             return {
                 completionDate: formattedDate,
@@ -455,7 +458,10 @@ app.get('/api/admin/reports/pdf', async (req, res) => {
             const paid = Number(o.total || 0);
             totalSum += paid;
             let formattedDate = o.completionDate || o.date;
-            try { if(o.completionDate) formattedDate = new Date(o.completionDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); } catch(e){}
+            try { 
+                const d = new Date(o.completionDate || o.date);
+                formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            } catch(e){}
 
             if (doc.y > 700) doc.addPage();
             const y = doc.y;
