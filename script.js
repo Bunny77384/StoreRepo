@@ -1,4 +1,4 @@
-const isLocal = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname) || 
+const isLocal = ['localhost', '127.0.0.1', '::1', ''].includes(window.location.hostname) || 
                window.location.hostname.startsWith('192.168.') || 
                window.location.hostname.startsWith('10.') || 
                window.location.hostname.startsWith('172.');
@@ -120,6 +120,13 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshPrintsDatabase();
         }
     }, 5000);
+
+    const printInputs = ['printPages', 'printCopies', 'printFormatType'];
+    printInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.oninput = updatePrintPricePreview;
+    });
+    updatePrintPricePreview();
 });
 
 // Click away listener for dropdowns
@@ -721,8 +728,8 @@ function processPayment(event) {
         if(d.success) {
             fetchProductsFromDB(); 
             // Save Prints automatically if they exist in the order
-            cart.filter(i => i.isPrint).forEach(pr => {
-                const printObj = { ...pr, id: `${orderId}-P`, userId: currentUser.email, orderId: orderId, status: 'Placed', date: new Date().toLocaleDateString() };
+            cart.filter(i => i.isPrint).forEach((pr, index) => {
+                const printObj = { ...pr, id: `${orderId}-P${index + 1}`, userId: currentUser.email, orderId: orderId, status: 'Placed', date: new Date().toLocaleDateString() };
                 fetch(`${API_URL}/api/prints`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1347,6 +1354,42 @@ function downloadReport(type) {
     window.location.href = `${API_URL}/api/admin/reports/${type}`;
 }
 
+function calculatePrintCost() {
+    const pagesRange = document.getElementById('printPages').value || '1';
+    const copies = parseInt(document.getElementById('printCopies').value) || 1;
+    const format = document.getElementById('printFormatType').value || 'Single Side';
+
+    let N = 1;
+    if (format.includes("2 per page") || format.includes("Double Side")) N = 2;
+    if (format.includes("4 per page")) N = 4;
+    
+    let pageCount = 1;
+    if (pagesRange.toLowerCase() === 'all') {
+        pageCount = 10; // Default estimate
+    } else if (pagesRange.includes('-')) {
+        const parts = pagesRange.split('-');
+        const start = parseInt(parts[0]) || 1;
+        const end = parseInt(parts[1]) || 1;
+        pageCount = Math.max(1, (end - start) + 1);
+    } else {
+        pageCount = parseInt(pagesRange) || 1;
+    }
+
+    const totalSides = Math.ceil(pageCount / N);
+    const totalPrice = totalSides * copies * 1;
+    return { totalPrice, totalUnits: totalSides * copies, pageCount };
+}
+
+function updatePrintPricePreview() {
+    const previewEl = document.getElementById('printPricePreview');
+    const unitsEl = document.getElementById('printPreviewSides');
+    if (!previewEl || !unitsEl) return;
+    
+    const { totalPrice, totalUnits } = calculatePrintCost();
+    previewEl.textContent = totalPrice;
+    unitsEl.textContent = totalUnits;
+}
+
 function handlePrintRequest(e) {
     e.preventDefault();
     const fileInput = document.getElementById('printFile');
@@ -1358,32 +1401,10 @@ function handlePrintRequest(e) {
     const file = fileInput.files[0];
     const fileName = file.name;
     
-    // Read file as Base64 for actual opening by Admin later
     const reader = new FileReader();
     reader.onload = function(event) {
         const fileData = event.target.result;
-        
-        // Correct Mathematical Formula for Print Pricing:
-        // Rule: ₹1 per side printed.
-        // N = Pages Per Sheet (1, 2, or 4).
-        // Total Sides = ceil(Page Count / N).
-        // Price = Total Sides * Copies * 1.
-        
-        let N = 1;
-        if (format.includes("2 per page")) N = 2;
-        if (format.includes("4 per page")) N = 4;
-
-        let pageCount = 1;
-        if (pagesRange.toLowerCase() === 'all') {
-            pageCount = 10; // Default estimate for 'all' in demo
-        } else if (pagesRange.split('-').length > 1) {
-            pageCount = parseInt(pagesRange.split('-')[1]) - parseInt(pagesRange.split('-')[0]) + 1;
-        } else {
-            pageCount = parseInt(pagesRange) || 1;
-        }
-
-        let totalSides = Math.ceil(pageCount / N);
-        let totalPrice = totalSides * copies * 1;
+        const { totalPrice } = calculatePrintCost();
 
         const printItem = {
             name: `Print: ${fileName}`,
@@ -1401,7 +1422,8 @@ function handlePrintRequest(e) {
         cart.push(printItem);
         updateCartUI();
         document.getElementById('printForm').reset();
-        showToast(`Print Task added to cart (₹${totalPrice})`, "success");
+        updatePrintPricePreview();
+        showToast(`Print Task added (₹${totalPrice})`, "success");
         toggleCart();
     };
     reader.readAsDataURL(file);
@@ -1430,12 +1452,7 @@ function updatePrintUI() {
     const list = document.getElementById('printRequestsList');
     if (!list) return;
     const myReqs = printRequests.filter(r => r.userId === currentUser.email);
-    if (myReqs.length === 0) {
-        list.innerHTML = `<div class="text-center text-muted p-2" style="border: 1px dashed var(--border); border-radius:8px;">No active print requests.</div>`;
-        return;
-    }
-
-    list.innerHTML = myReqs.slice().reverse().map(r => `
+    let html = myReqs.slice().reverse().map(r => `
         <div style="background:var(--bg-white); border:1px solid var(--border); padding:1rem; border-radius:var(--radius-md); margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <strong class="text-primary">${r.id}</strong> - ${r.fileName}
@@ -1448,10 +1465,15 @@ function updatePrintUI() {
         </div>
     `).join('');
 
+    if (myReqs.length === 0 && cart.filter(i => i.isPrint).length === 0) {
+        list.innerHTML = `<div class="text-center text-muted p-2" style="border: 1px dashed var(--border); border-radius:8px;">No active or pending print requests.</div>`;
+        return;
+    }
+
     // Also show items currently in cart but not yet paid (placed)
     const cartPrints = cart.filter(i => i.isPrint);
     if (cartPrints.length > 0) {
-        list.innerHTML += `
+        html += `
             <div style="margin-top:1.5rem; border-top: 1px dashed var(--border); padding-top:1rem;">
                 <h4 class="text-sm text-muted mb-1"><i class="fas fa-shopping-cart"></i> Pending in Cart (Unpaid)</h4>
                 ${cartPrints.map(cp => `
@@ -1462,6 +1484,8 @@ function updatePrintUI() {
             </div>
         `;
     }
+    
+    list.innerHTML = html;
 
 }
 
