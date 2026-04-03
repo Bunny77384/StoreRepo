@@ -1240,7 +1240,14 @@ function updateAdminDashboard() {
     
     document.getElementById('adminTotalSales').textContent = parseFloat(todaySales || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
     document.getElementById('adminLifetimeRev').textContent = parseFloat(lifetimeRevenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-    document.getElementById('adminTotalOrders').textContent = (globalOrders || []).filter(o => o.status === 'Placed' || o.status === 'Accepted').length;
+    
+    // Count ONLY non-pure-print orders (ones visible in the Live Queue)
+    const activeOrderCount = (globalOrders || []).filter(o => {
+        const isPurePrint = (o.items || []).every(item => item.isPrint);
+        return !isPurePrint && (o.status === 'Placed' || o.status === 'Accepted');
+    }).length;
+    
+    document.getElementById('adminTotalOrders').textContent = activeOrderCount;
     document.getElementById('adminPendingReqs').textContent = (notifyRequests || []).length;
     document.getElementById('adminNotifsSent').textContent = adminNotifsSentCounter || 0;
 
@@ -1570,6 +1577,22 @@ function updateAdminPrintStatus(reqId, newStatus) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(req)
     }).catch(e=>console.error(e));
+
+    // SYNC: If print is completed and it's a pure-print order, mark the Order as completed too for timeline sync
+    if (newStatus === 'Completed' && req.orderId) {
+        const parentOrder = globalOrders.find(o => o.id === req.orderId);
+        if (parentOrder) {
+            const isPurePrintOrder = (parentOrder.items || []).every(item => item.isPrint);
+            if (isPurePrintOrder && parentOrder.status !== 'Completed') {
+                parentOrder.status = 'Completed';
+                fetch(`${API_URL}/api/orders/${parentOrder.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Completed' })
+                }).then(() => refreshOrdersDatabase());
+            }
+        }
+    }
 
     if (newStatus === 'Accepted') {
         pushSystemNotification(req.userId, `Print Request Accepted`, `Your document ${req.fileName} has been queued for printing.`);

@@ -156,7 +156,7 @@ async function seedProducts() {
 seedProducts();
 
 app.get('/api/products', async (req, res) => {
-    // If DB is disconnected or buffering, serve Static Fallback to keep UI alive (Campus Catalog)
+    // If DB is disconnected or buffering, serve Static Fallback (Campus Catalog)
     if (mongoose.connection.readyState !== 1) {
         console.warn("⚠️ Serving Catalog from Backup (Local Sync Mode)");
         return res.json(fallbackProducts);
@@ -208,7 +208,6 @@ async function trackSale(item, orderDate) {
 }
 
 // --- Automated Daily Reports @ 7:00 PM ---
-// Trigger this logic manually for the user via /api/admin/force-report for testing!
 async function generateDailyReport() {
     const today = new Date().toLocaleDateString();
     
@@ -237,7 +236,6 @@ async function generateDailyReport() {
     return report;
 }
 
-// Cron: At 19:00 (7 PM)
 cron.schedule('0 19 * * *', () => {
     generateDailyReport();
 });
@@ -378,18 +376,20 @@ app.put('/api/prints/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Update print failed" }); }
 });
 
-// --- Report Downloads ---
+// --- Master Audit Reports ---
 
 app.get('/api/admin/reports/csv', async (req, res) => {
     try {
         const completedOrders = await Order.find({ status: 'Completed' }).select('-items');
+        const completedPrints = await PrintRequest.find({ status: 'Completed' });
         const filePath = path.join(__dirname, 'completed_orders_audit.csv');
         
         const csvWriter = createObjectCsvWriter({
             path: filePath,
             header: [
                 { id: 'completionDate', title: 'Completed At' },
-                { id: 'id', title: 'Order #' },
+                { id: 'id', title: 'Record ID' },
+                { id: 'type', title: 'Type' },
                 { id: 'originalTotal', title: 'Original Amount' },
                 { id: 'total', title: 'Amount Paid' },
                 { id: 'redeemedPoints', title: 'Redeemed?' },
@@ -398,30 +398,50 @@ app.get('/api/admin/reports/csv', async (req, res) => {
         });
 
         let totalSum = 0;
-        const records = completedOrders.map(o => {
-            const disc = o.redeemedPoints ? 30 : 0;
-            totalSum += o.total;
-            let formattedDate = o.completionDate || o.date;
-            try { 
-                const d = new Date(o.completionDate || o.date);
-                formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-            } catch(e){}
+        const records = [];
 
-            return {
+        completedOrders.forEach(o => {
+            const disc = o.redeemedPoints ? 30 : 0;
+            totalSum += Number(o.total || 0);
+            const d = new Date(o.completionDate || o.date);
+            const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+
+            records.push({
                 completionDate: formattedDate,
                 id: o.id,
-                originalTotal: o.originalTotal || (Number(o.total) + disc),
-                total: o.total,
+                type: 'Product',
+                originalTotal: Number(o.originalTotal || (Number(o.total) + disc)),
+                total: Number(o.total),
                 redeemedPoints: o.redeemedPoints ? 'Yes' : 'No',
                 discount: disc
-            };
+            });
         });
 
-        records.push({ completionDate: 'TOTAL SUM', total: totalSum });
+        completedPrints.forEach(pr => {
+            const paid = Number(pr.price || 0);
+            totalSum += paid;
+            const d = new Date(pr.date);
+            const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            
+            records.push({
+                completionDate: formattedDate,
+                id: pr.id,
+                type: 'Print Service',
+                originalTotal: paid,
+                total: paid,
+                redeemedPoints: 'N/A',
+                discount: 0
+            });
+        });
+
+        records.push({ completionDate: 'MASTER TOTAL', total: totalSum });
 
         await csvWriter.writeRecords(records);
         res.download(filePath, () => { if(fs.existsSync(filePath)) fs.unlinkSync(filePath); });
-    } catch(err) { res.status(500).send("Report error"); }
+    } catch(err) { 
+        console.error("CSV Export Error:", err);
+        res.status(500).send("Report error"); 
+    }
 });
 
 app.get('/api/admin/reports/pdf', async (req, res) => {
@@ -453,13 +473,12 @@ app.get('/api/admin/reports/pdf', async (req, res) => {
         let totalSum = 0;
         doc.font('Helvetica');
         
-        // Orders Section
         completedOrders.forEach(o => {
             const disc = o.redeemedPoints ? 30 : 0;
             const paid = Number(o.total || 0);
             totalSum += paid;
-            let d = new Date(o.completionDate || o.date);
-            let formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            const d = new Date(o.completionDate || o.date);
+            const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 
             if (doc.y > 700) doc.addPage();
             const y = doc.y;
@@ -472,7 +491,6 @@ app.get('/api/admin/reports/pdf', async (req, res) => {
             doc.moveDown();
         });
 
-        // Prints Section
         if (completedPrints.length > 0) {
             doc.moveDown().font('Helvetica-Bold').fontSize(12).text('Completed Print Revenue', startX);
             doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke().moveDown();
@@ -481,8 +499,8 @@ app.get('/api/admin/reports/pdf', async (req, res) => {
             completedPrints.forEach(pr => {
                 const paid = Number(pr.price || 0);
                 totalSum += paid;
-                let d = new Date(pr.date);
-                let formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                const d = new Date(pr.date);
+                const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 
                 if (doc.y > 700) doc.addPage();
                 const y = doc.y;
@@ -507,13 +525,11 @@ app.get('/api/admin/reports/pdf', async (req, res) => {
     }
 });
 
-// Force generate a report for immediate validation
 app.post('/api/admin/force-report', async (req, res) => {
     const report = await generateDailyReport();
     res.json({ success: true, report });
 });
 
-// Auth Routes... (rest of the file as is)
 app.post('/api/signup', async (req, res) => {
     if (mongoose.connection.readyState !== 1) {
         console.error("❌ Signup Attempt Failed: Database is not connected.");
@@ -522,16 +538,10 @@ app.post('/api/signup', async (req, res) => {
     
     try {
         const { name, email, usn, pwd, refCode } = req.body;
-        
-        // Validation check for empty fields
-        if (!name || !email || !usn || !pwd) {
-             return res.status(400).json({ error: "All fields are required." });
-        }
+        if (!name || !email || !usn || !pwd) return res.status(400).json({ error: "All fields are required." });
 
         const existingUser = await User.findOne({ $or: [{ email }, { usn }] });
-        if (existingUser) {
-            return res.status(400).json({ error: "Email or USN already registered." });
-        }
+        if (existingUser) return res.status(400).json({ error: "Email or USN already registered." });
         
         const referralCode = name.substring(0, 4).toUpperCase().replace(/\s/g, '') + Math.floor(100+Math.random()*900);
         let startingPoints = 50; 
@@ -549,8 +559,7 @@ app.post('/api/signup', async (req, res) => {
 
         const newUser = new User({ 
             name, email, usn, pwd, role: "student", 
-            points: startingPoints, referralCode, 
-            refUsed: refUsedByMe 
+            points: startingPoints, referralCode, refUsed: refUsedByMe 
         });
         await newUser.save();
         res.json({ message: "Signup success", user: newUser });
