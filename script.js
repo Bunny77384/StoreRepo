@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 5000);
 
-    const printInputs = ['printPages', 'printCopies', 'printFormatType'];
+    const printInputs = ['printTotalPages', 'printPages', 'printCopies', 'printFormatType'];
     printInputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.oninput = updatePrintPricePreview;
@@ -1288,7 +1288,7 @@ function updateAdminDashboard() {
                 }
             </p>
             <p><strong>Price Paid:</strong> <strong class="text-success">₹${r.price || 0}</strong></p>
-            <p><strong>Config:</strong> ${r.pages} Pages, ${r.copies} Copies | <strong>${r.format}</strong></p>
+            <p><strong>Config:</strong> ${r.totalPages || '?'} Total Pgs, ${r.pages} Range, ${r.copies} Copies | <strong>${r.format}</strong></p>
             <div style="text-align:right; margin-top:0.75rem;">
                 <select class="admin-select bg-${r.status}" onchange="updateAdminPrintStatus('${r.id}', this.value)">
                     <option value="Placed" ${r.status === 'Placed' ? 'selected' : ''}>Placed</option>
@@ -1355,6 +1355,7 @@ function downloadReport(type) {
 }
 
 function calculatePrintCost() {
+    const totalPagesInput = document.getElementById('printTotalPages');
     const pagesRange = document.getElementById('printPages').value || '1';
     const copies = parseInt(document.getElementById('printCopies').value) || 1;
     const format = document.getElementById('printFormatType').value || 'Single Side';
@@ -1364,8 +1365,8 @@ function calculatePrintCost() {
     if (format.includes("4 per page")) N = 4;
     
     let pageCount = 1;
-    if (pagesRange.toLowerCase() === 'all') {
-        pageCount = 10; // Default estimate
+    if (pagesRange.toLowerCase() === 'all' || !pagesRange) {
+        pageCount = parseInt(totalPagesInput?.value) || 1;
     } else if (pagesRange.includes('-')) {
         const parts = pagesRange.split('-');
         const start = parseInt(parts[0]) || 1;
@@ -1414,6 +1415,7 @@ function handlePrintRequest(e) {
             fileName,
             fileData,
             pages: pagesRange,
+            totalPages: parseInt(document.getElementById('printTotalPages').value) || 1,
             copies,
             format,
             isBundle: false
@@ -1422,7 +1424,13 @@ function handlePrintRequest(e) {
         cart.push(printItem);
         updateCartUI();
         document.getElementById('printForm').reset();
-        updatePrintPricePreview();
+        
+        // Reset price preview
+        const previewEl = document.getElementById('printPricePreview');
+        const unitsEl = document.getElementById('printPreviewSides');
+        if (previewEl) previewEl.textContent = '0';
+        if (unitsEl) unitsEl.textContent = '0';
+        
         showToast(`Print Task added (₹${totalPrice})`, "success");
         toggleCart();
     };
@@ -1456,7 +1464,7 @@ function updatePrintUI() {
         <div style="background:var(--bg-white); border:1px solid var(--border); padding:1rem; border-radius:var(--radius-md); margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <strong class="text-primary">${r.id}</strong> - ${r.fileName}
-                <div class="text-sm text-muted mt-1">Pages: ${r.pages} | Copies: ${r.copies} | Format: <strong>${r.format}</strong></div>
+                <div class="text-sm text-muted mt-1">Total Pgs: ${r.totalPages || '?'} | Range: ${r.pages} | Copies: ${r.copies} | Format: <strong>${r.format}</strong></div>
                 <div class="text-sm font-bold text-success mt-1">Paid: ₹${r.price || 0}</div>
             </div>
             <div>

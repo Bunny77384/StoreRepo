@@ -68,7 +68,8 @@ const PrintSchema = new mongoose.Schema({
     date: String,
     price: Number,
     fileData: String,
-    orderId: String
+    orderId: String,
+    totalPages: Number
 });
 const PrintRequest = mongoose.model('PrintRequest', PrintSchema);
 
@@ -334,7 +335,7 @@ app.put('/api/notifications/:id', async (req, res) => {
 
 app.get('/api/prints', async (req, res) => {
     try {
-        const prints = await PrintRequest.find({});
+        const prints = await PrintRequest.find({}).sort({ _id: -1 }).limit(100);
         res.json(prints);
     } catch (err) { res.status(500).json({ error: "Fetch prints failed" }); }
 });
@@ -358,7 +359,7 @@ app.put('/api/prints/:id', async (req, res) => {
 
 app.get('/api/admin/reports/csv', async (req, res) => {
     try {
-        const completedOrders = await Order.find({ status: 'Completed' });
+        const completedOrders = await Order.find({ status: 'Completed' }).select('-items');
         const filePath = path.join(__dirname, 'completed_orders_audit.csv');
         
         const csvWriter = createObjectCsvWriter({
@@ -399,7 +400,7 @@ app.get('/api/admin/reports/csv', async (req, res) => {
 
 app.get('/api/admin/reports/pdf', async (req, res) => {
     try {
-        const completedOrders = await Order.find({ status: 'Completed' });
+        const completedOrders = await Order.find({ status: 'Completed' }).select('-items');
         const doc = new PDFDocument({ margin: 30 });
         res.setHeader('Content-Type', 'application/pdf');
         doc.pipe(res);

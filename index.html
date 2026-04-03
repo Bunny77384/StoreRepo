@@ -232,13 +232,17 @@
                                     <input type="file" id="printFile" accept=".pdf,.doc,.docx" required
                                         style="padding: 0.5rem; background: var(--bg-light);">
                                 </div>
-                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
                                     <div class="form-group mb-1">
-                                        <label>Pages to Print</label>
-                                        <input type="text" id="printPages" placeholder="e.g. 1-10 or All" required>
+                                        <label>Total Pages</label>
+                                        <input type="number" id="printTotalPages" min="1" placeholder="Total" required>
                                     </div>
                                     <div class="form-group mb-1">
-                                        <label>Number of Copies</label>
+                                        <label>Pages to Print</label>
+                                        <input type="text" id="printPages" placeholder="1-10 or All" required>
+                                    </div>
+                                    <div class="form-group mb-1">
+                                        <label>Copies</label>
                                         <input type="number" id="printCopies" min="1" value="1" required>
                                     </div>
                                 </div>
