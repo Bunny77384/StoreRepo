@@ -474,22 +474,35 @@ app.post('/api/admin/force-report', async (req, res) => {
 
 // Auth Routes... (rest of the file as is)
 app.post('/api/signup', async (req, res) => {
+    if (mongoose.connection.readyState !== 1) {
+        console.error("❌ Signup Attempt Failed: Database is not connected.");
+        return res.status(503).json({ error: "Database is connecting/offline. Please try again in 10 seconds." });
+    }
+    
     try {
         const { name, email, usn, pwd, refCode } = req.body;
-        const existingUser = await User.findOne({ $or: [{ email }, { usn }] });
-        if (existingUser) return res.status(400).json({ error: "USN already used." });
         
-        const referralCode = name.substring(0, 4).toUpperCase() + Math.floor(100+Math.random()*900);
-        let startingPoints = 50; // Standard signup bonus
+        // Validation check for empty fields
+        if (!name || !email || !usn || !pwd) {
+             return res.status(400).json({ error: "All fields are required." });
+        }
+
+        const existingUser = await User.findOne({ $or: [{ email }, { usn }] });
+        if (existingUser) {
+            return res.status(400).json({ error: "Email or USN already registered." });
+        }
+        
+        const referralCode = name.substring(0, 4).toUpperCase().replace(/\s/g, '') + Math.floor(100+Math.random()*900);
+        let startingPoints = 50; 
         let refUsedByMe = null;
 
         if (refCode) {
             const referrer = await User.findOne({ referralCode: refCode });
             if (referrer) {
-                referrer.points += 50; // Award 50 bonus points to existing student
+                referrer.points += 50;
                 await referrer.save();
                 refUsedByMe = refCode;
-                startingPoints += 25; // 75 Total (50 base + 25 bonus)
+                startingPoints += 25;
             }
         }
 
@@ -500,7 +513,10 @@ app.post('/api/signup', async (req, res) => {
         });
         await newUser.save();
         res.json({ message: "Signup success", user: newUser });
-    } catch(err) { res.status(500).json({ error: "DB Error" }); }
+    } catch(err) { 
+        console.error("🚩 Signup DB Error:", err);
+        res.status(500).json({ error: "Database Save Error: " + (err.code === 11000 ? "USN or Email already exists in records." : err.message) }); 
+    }
 });
 
 app.post('/api/login', async (req, res) => {
