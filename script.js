@@ -1168,16 +1168,6 @@ function updateStudentDashboard() {
         } else {
             let currentIdx = timelines.indexOf(order.status);
             timelineHtml = `<div class="timeline">`;
-            const progressMap = { 'Placed': 0, 'Accepted': 33, 'Ready': 66, 'Completed': 100 };
-            const currentProgress = progressMap[order.status] || 0;
-            
-            timelineHtml = `
-            <div class="timeline-wrapper" style="position:relative; padding:1.5rem 0 0.5rem 0;">
-                <div class="timeline-progress-bg" style="position:absolute; top:35px; left:5%; right:5%; height:4px; background:var(--border); z-index:1; border-radius:10px;">
-                    <div class="timeline-progress-fill" style="width:${currentProgress}%; height:100%; background:var(--primary); transition: width 0.5s ease; border-radius:10px;"></div>
-                </div>
-                <div class="timeline" style="position:relative; z-index:2; display:flex; justify-content:space-between;">`;
-            
             timelines.forEach((step, idx) => {
                 let stateClass = '';
                 if (idx < currentIdx) stateClass = 'completed';
@@ -1189,14 +1179,12 @@ function updateStudentDashboard() {
                 if (step === 'Completed') icon = 'fa-flag-checkered';
 
                 timelineHtml += `
-                <div class="timeline-step ${stateClass}" style="flex:1; text-align:center;">
-                    <div class="step-icon-circle" style="width:36px; height:36px; border-radius:50%; background:var(--bg-white); border:2px solid ${stateClass ? 'var(--primary)' : 'var(--border)'}; display:flex; align-items:center; justify-content:center; margin:0 auto 0.5rem; color:${stateClass ? 'var(--primary)' : 'var(--text-muted)'}; position:relative; background:white;">
-                        <i class="fas ${icon}" style="font-size:1rem;"></i>
-                    </div>
-                    <div class="timeline-label" style="font-size:0.75rem; font-weight:bold; color:${stateClass === 'active' ? 'var(--primary)' : 'var(--text-muted)'};">${step}</div>
+                <div class="timeline-step ${stateClass}">
+                    <i class="fas ${icon}"></i>
+                    <div class="timeline-label">${step}</div>
                 </div>`;
             });
-            timelineHtml += `</div></div>`;
+            timelineHtml += `</div>`;
         }
 
         if (order.status === 'Placed' || order.status === 'Accepted' || order.status === 'Ready') {
