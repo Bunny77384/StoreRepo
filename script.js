@@ -1164,7 +1164,7 @@ function updateStudentDashboard() {
         let actionButtons = '';
 
         if (order.status === 'Cancelled') {
-            timelineHtml = `<div class="badge-status bg-Cancelled mt-2 w-100" style="display:flex; justify-content:center; font-size: 0.85rem; padding:0.5rem;"><i class="fas fa-times-circle"></i> Transaction Closed & Refund Math Applied</div>`;
+            timelineHtml = `<div class="badge-status bg-Cancelled mt-2 w-100" style="display:flex; justify-content:center; gap:0.5rem; font-size: 0.85rem; padding:0.5rem;"><i class="fas fa-times-circle"></i> Transaction Closed & Refund Math Applied</div>`;
         } else {
             let currentIdx = timelines.indexOf(order.status);
             timelineHtml = `<div class="timeline">`;
@@ -1173,10 +1173,10 @@ function updateStudentDashboard() {
                 if (idx < currentIdx) stateClass = 'completed';
                 else if (idx === currentIdx) stateClass = 'active';
 
-                let icon = 'fa-clipboard-list';
-                if (step === 'Accepted') icon = 'fa-thumbs-up';
-                if (step === 'Ready') icon = 'fa-box';
-                if (step === 'Completed') icon = 'fa-check-double';
+                let icon = 'fa-file-invoice';
+                if (step === 'Accepted') icon = 'fa-check-circle';
+                if (step === 'Ready') icon = 'fa-box-open';
+                if (step === 'Completed') icon = 'fa-flag-checkered';
 
                 timelineHtml += `
                 <div class="timeline-step ${stateClass}">
@@ -1330,13 +1330,15 @@ function updateAdminDashboard() {
             <p><strong>Price Paid:</strong> <strong class="text-success">₹${r.price || 0}</strong></p>
             <p><strong>Config:</strong> ${r.totalPages || '?'} Total Pgs, ${r.pages} Range, ${r.copies} Copies | <strong>${r.format}</strong></p>
             <div style="text-align:right; margin-top:0.75rem;">
-                <select class="admin-select bg-${r.status}" onchange="updateAdminPrintStatus('${r.id}', this.value)">
-                    <option value="Placed" ${r.status === 'Placed' ? 'selected' : ''}>Placed</option>
-                    <option value="Accepted" ${r.status === 'Accepted' ? 'selected' : ''}>Accepted</option>
-                    <option value="Ready" ${r.status === 'Ready' ? 'selected' : ''}>Ready</option>
-                    <option value="Completed" ${r.status === 'Completed' ? 'selected' : ''}>Completed</option>
-                    <option value="Cancelled" ${r.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
-                </select>
+                ${r.status === 'Completed' ? '<span class="badge-status bg-Completed">Completed</span>' : 
+                  r.status === 'Cancelled' ? '<span class="badge-status bg-Cancelled">Cancelled</span>' : `
+                    <select class="admin-select bg-${r.status}" onchange="updateAdminPrintStatus('${r.id}', this.value)">
+                        <option value="Placed" ${r.status === 'Placed' ? 'selected' : ''}>Placed</option>
+                        <option value="Accepted" ${r.status === 'Accepted' ? 'selected' : ''}>Accepted</option>
+                        <option value="Ready" ${r.status === 'Ready' ? 'selected' : ''}>Ready</option>
+                        <option value="Completed" ${r.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                        <option value="Cancelled" ${r.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                    </select>`}
             </div>
         </div>
     `).join('') || `<div class="text-center text-muted p-2">No ${adminPrintActiveTab} requests.</div>`;
@@ -1580,16 +1582,27 @@ function updateAdminPrintStatus(reqId, newStatus) {
 
     // SYNC: If print is completed and it's a pure-print order, mark the Order as completed too for timeline sync
     if (newStatus === 'Completed' && req.orderId) {
-        const parentOrder = globalOrders.find(o => o.id === req.orderId);
-        if (parentOrder) {
-            const isPurePrintOrder = (parentOrder.items || []).every(item => item.isPrint);
-            if (isPurePrintOrder && parentOrder.status !== 'Completed') {
-                parentOrder.status = 'Completed';
+        const orderIdSearch = req.orderId;
+        const parentOrder = (globalOrders || []).find(o => o.id === orderIdSearch);
+        if (parentOrder && parentOrder.status !== 'Completed') {
+            const items = parentOrder.items || [];
+            // A pure print order is one where EVERY item is either a print task OR has "Print" in its name
+            const isPurePrintOrder = items.length > 0 && items.every(item => item.isPrint || (item.name && item.name.toLowerCase().includes('print')));
+            
+            if (isPurePrintOrder) {
+                console.log(`📡 Auto-completing Pure Print Order: ${parentOrder.id}`);
+                parentOrder.status = 'Completed'; 
                 fetch(`${API_URL}/api/orders/${parentOrder.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'Completed' })
-                }).then(() => refreshOrdersDatabase());
+                    body: JSON.stringify({ 
+                        status: 'Completed', 
+                        completionDate: new Date().toISOString() 
+                    })
+                }).then(() => {
+                    refreshOrdersDatabase();
+                    if (typeof updateStudentDashboard === 'function') updateStudentDashboard();
+                });
             }
         }
     }
