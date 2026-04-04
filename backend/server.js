@@ -380,10 +380,14 @@ app.put('/api/prints/:id', async (req, res) => {
 
 app.get('/api/admin/reports/csv', async (req, res) => {
     try {
-        const completedOrders = await Order.find({ status: 'Completed' }).select('-items');
-        const completedPrints = await PrintRequest.find({ status: 'Completed' });
-        const filePath = path.join(__dirname, 'completed_orders_audit.csv');
+        const d = new Date();
+        const today = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
         
+        // Fetch only records from TODAY
+        const allCompletedOrders = await Order.find({ status: 'Completed' }).select('-items');
+        const allCompletedPrints = await PrintRequest.find({ status: 'Completed' });
+
+        const filePath = path.join(__dirname, 'daily_audit_report.csv');
         const csvWriter = createObjectCsvWriter({
             path: filePath,
             header: [
@@ -400,41 +404,45 @@ app.get('/api/admin/reports/csv', async (req, res) => {
         let totalSum = 0;
         const records = [];
 
-        completedOrders.forEach(o => {
-            const disc = o.redeemedPoints ? 30 : 0;
-            totalSum += Number(o.total || 0);
-            const d = new Date(o.completionDate || o.date);
-            const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-
-            records.push({
-                completionDate: formattedDate,
-                id: o.id,
-                type: 'Product',
-                originalTotal: Number(o.originalTotal || (Number(o.total) + disc)),
-                total: Number(o.total),
-                redeemedPoints: o.redeemedPoints ? 'Yes' : 'No',
-                discount: disc
-            });
-        });
-
-        completedPrints.forEach(pr => {
-            const paid = Number(pr.price || 0);
-            totalSum += paid;
-            const d = new Date(pr.date);
-            const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        allCompletedOrders.forEach(o => {
+            const dateObj = new Date(o.completionDate || o.date);
+            const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}`;
             
-            records.push({
-                completionDate: formattedDate,
-                id: pr.id,
-                type: 'Print Service',
-                originalTotal: paid,
-                total: paid,
-                redeemedPoints: 'N/A',
-                discount: 0
-            });
+            if (formattedDate === today) {
+                const disc = o.redeemedPoints ? 30 : 0;
+                totalSum += Number(o.total || 0);
+                records.push({
+                    completionDate: formattedDate,
+                    id: o.id,
+                    type: 'Product',
+                    originalTotal: Number(o.originalTotal || (Number(o.total) + disc)),
+                    total: Number(o.total),
+                    redeemedPoints: o.redeemedPoints ? 'Yes' : 'No',
+                    discount: disc
+                });
+            }
         });
 
-        records.push({ completionDate: 'MASTER TOTAL', total: totalSum });
+        allCompletedPrints.forEach(pr => {
+            const dateObj = new Date(pr.date);
+            const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}`;
+            
+            if (formattedDate === today) {
+                const paid = Number(pr.price || 0);
+                totalSum += paid;
+                records.push({
+                    completionDate: formattedDate,
+                    id: pr.id,
+                    type: 'Print Service',
+                    originalTotal: paid,
+                    total: paid,
+                    redeemedPoints: 'N/A',
+                    discount: 0
+                });
+            }
+        });
+
+        records.push({ completionDate: `DAILY TOTAL (${today})`, total: totalSum });
 
         await csvWriter.writeRecords(records);
         res.download(filePath, () => { if(fs.existsSync(filePath)) fs.unlinkSync(filePath); });
@@ -446,16 +454,19 @@ app.get('/api/admin/reports/csv', async (req, res) => {
 
 app.get('/api/admin/reports/pdf', async (req, res) => {
     try {
-        const completedOrders = await Order.find({ status: 'Completed' }).select('-items');
-        const completedPrints = await PrintRequest.find({ status: 'Completed' });
-        const doc = new PDFDocument({ margin: 30 });
+        const d = new Date();
+        const today = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+
+        const allCompletedOrders = await Order.find({ status: 'Completed' }).select('-items');
+        const allCompletedPrints = await PrintRequest.find({ status: 'Completed' });
         
+        const doc = new PDFDocument({ margin: 30 });
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename=completed_orders_audit.pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=Daily_Audit_${today.replace(/\//g, '-')}.pdf`);
         doc.pipe(res);
 
         doc.fontSize(22).text('Daily Master Audit Report', { align: 'center' });
-        doc.fontSize(10).text(`Generated on: ${new Date().toLocaleString()}`, { align: 'center' });
+        doc.fontSize(10).text(`Audit Date: ${today}`, { align: 'center' });
         doc.moveDown(2);
 
         const startX = 30;
@@ -473,38 +484,48 @@ app.get('/api/admin/reports/pdf', async (req, res) => {
         let totalSum = 0;
         doc.font('Helvetica');
         
-        completedOrders.forEach(o => {
-            const disc = o.redeemedPoints ? 30 : 0;
-            const paid = Number(o.total || 0);
-            totalSum += paid;
-            const d = new Date(o.completionDate || o.date);
-            const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-
-            if (doc.y > 700) doc.addPage();
-            const y = doc.y;
-            doc.text(formattedDate, startX, y, { width: 120 });
-            doc.text(String(o.id || 'N/A'), startX + 130, y, { width: 80 });
-            doc.text(`Rs.${Number(o.originalTotal || (paid + disc))}`, startX + 220, y, { width: 80 });
-            doc.text(`Rs.${paid}`, startX + 310, y, { width: 60 });
-            doc.text(o.redeemedPoints ? 'Yes' : 'No', startX + 380, y, { width: 60 });
-            doc.text(`Rs.${disc}`, startX + 450, y, { width: 50 });
-            doc.moveDown();
-        });
-
-        if (completedPrints.length > 0) {
-            doc.moveDown().font('Helvetica-Bold').fontSize(12).text('Completed Print Revenue', startX);
-            doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke().moveDown();
-            doc.font('Helvetica').fontSize(10);
-
-            completedPrints.forEach(pr => {
-                const paid = Number(pr.price || 0);
+        // Orders Loop
+        allCompletedOrders.forEach(o => {
+            const dateObj = new Date(o.completionDate || o.date);
+            const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}`;
+            
+            if (formattedDate === today) {
+                const disc = o.redeemedPoints ? 30 : 0;
+                const paid = Number(o.total || 0);
                 totalSum += paid;
-                const d = new Date(pr.date);
-                const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 
                 if (doc.y > 700) doc.addPage();
                 const y = doc.y;
                 doc.text(formattedDate, startX, y, { width: 120 });
+                doc.text(String(o.id || 'N/A'), startX + 130, y, { width: 80 });
+                doc.text(`Rs.${Number(o.originalTotal || (paid + disc))}`, startX + 220, y, { width: 80 });
+                doc.text(`Rs.${paid}`, startX + 310, y, { width: 60 });
+                doc.text(o.redeemedPoints ? 'Yes' : 'No', startX + 380, y, { width: 60 });
+                doc.text(`Rs.${disc}`, startX + 450, y, { width: 50 });
+                doc.moveDown();
+            }
+        });
+
+        // Prints Loop
+        const dailyPrints = [];
+        allCompletedPrints.forEach(pr => {
+            const dateObj = new Date(pr.date);
+            const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}`;
+            if (formattedDate === today) dailyPrints.push(pr);
+        });
+
+        if (dailyPrints.length > 0) {
+            doc.moveDown().font('Helvetica-Bold').fontSize(12).text('Completed Print Revenue (Today)', startX);
+            doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke().moveDown();
+            doc.font('Helvetica').fontSize(10);
+
+            dailyPrints.forEach(pr => {
+                const paid = Number(pr.price || 0);
+                totalSum += paid;
+
+                if (doc.y > 700) doc.addPage();
+                const y = doc.y;
+                doc.text(today, startX, y, { width: 120 });
                 doc.text(String(pr.id || 'N/A'), startX + 130, y, { width: 80 });
                 doc.text(`Rs.${paid}`, startX + 220, y, { width: 80 });
                 doc.text(`Rs.${paid}`, startX + 310, y, { width: 60 });
@@ -516,7 +537,7 @@ app.get('/api/admin/reports/pdf', async (req, res) => {
 
         doc.moveDown();
         doc.moveTo(startX, doc.y).lineTo(570, doc.y).stroke().moveDown();
-        doc.fontSize(14).font('Helvetica-Bold').text(`GRAND TOTAL REVENUE: Rs.${totalSum.toFixed(2)}`, { align: 'right' });
+        doc.fontSize(14).font('Helvetica-Bold').text(`TODAY'S TOTAL REVENUE: Rs.${totalSum.toFixed(2)}`, { align: 'right' });
 
         doc.end();
     } catch(err) { 
