@@ -1241,11 +1241,8 @@ function updateAdminDashboard() {
     document.getElementById('adminTotalSales').textContent = parseFloat(todaySales || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
     document.getElementById('adminLifetimeRev').textContent = parseFloat(lifetimeRevenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
     
-    // Count ONLY non-pure-print orders (ones visible in the Live Queue)
-    const activeOrderCount = (globalOrders || []).filter(o => {
-        const isPurePrint = (o.items || []).every(item => item.isPrint);
-        return !isPurePrint && (o.status === 'Placed' || o.status === 'Accepted');
-    }).length;
+    // Count ALL pending orders (including those that are purely prints)
+    const activeOrderCount = (globalOrders || []).filter(o => o.status === 'Placed' || o.status === 'Accepted' || o.status === 'Ready').length;
     
     document.getElementById('adminTotalOrders').textContent = activeOrderCount;
     document.getElementById('adminPendingReqs').textContent = (notifyRequests || []).length;
