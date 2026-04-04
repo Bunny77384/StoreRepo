@@ -1577,25 +1577,27 @@ function updateAdminPrintStatus(reqId, newStatus) {
         body: JSON.stringify(req)
     }).catch(e=>console.error(e));
 
-    // SYNC: If print is completed and it's a pure-print order, mark the Order as completed too for timeline sync
-    if (newStatus === 'Completed' && req.orderId) {
+    // SYNC: Synchronize Parent Order status for Pure-Print requests to keep student's timeline in lockstep
+    if (req.orderId) {
         const orderIdSearch = req.orderId;
         const parentOrder = (globalOrders || []).find(o => o.id === orderIdSearch);
-        if (parentOrder && parentOrder.status !== 'Completed') {
+        
+        if (parentOrder) {
             const items = parentOrder.items || [];
-            // A pure print order is one where EVERY item is either a print task OR has "Print" in its name
             const isPurePrintOrder = items.length > 0 && items.every(item => item.isPrint || (item.name && item.name.toLowerCase().includes('print')));
             
-            if (isPurePrintOrder) {
-                console.log(`📡 Auto-completing Pure Print Order: ${parentOrder.id}`);
-                parentOrder.status = 'Completed'; 
+            // Only auto-sync if it's a pure-print order (multi-product orders require separate fulfillment)
+            if (isPurePrintOrder && parentOrder.status !== newStatus) {
+                console.log(`📡 Syncing Dashboard State: Order ${parentOrder.id} -> ${newStatus}`);
+                parentOrder.status = newStatus;
+                
+                const updatePayload = { status: newStatus };
+                if (newStatus === 'Completed') updatePayload.completionDate = new Date().toISOString();
+
                 fetch(`${API_URL}/api/orders/${parentOrder.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        status: 'Completed', 
-                        completionDate: new Date().toISOString() 
-                    })
+                    body: JSON.stringify(updatePayload)
                 }).then(() => {
                     refreshOrdersDatabase();
                     if (typeof updateStudentDashboard === 'function') updateStudentDashboard();
