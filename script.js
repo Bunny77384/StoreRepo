@@ -1168,6 +1168,16 @@ function updateStudentDashboard() {
         } else {
             let currentIdx = timelines.indexOf(order.status);
             timelineHtml = `<div class="timeline">`;
+            const progressMap = { 'Placed': 0, 'Accepted': 33, 'Ready': 66, 'Completed': 100 };
+            const currentProgress = progressMap[order.status] || 0;
+            
+            timelineHtml = `
+            <div class="timeline-wrapper" style="position:relative; padding:1.5rem 0 0.5rem 0;">
+                <div class="timeline-progress-bg" style="position:absolute; top:35px; left:5%; right:5%; height:4px; background:var(--border); z-index:1; border-radius:10px;">
+                    <div class="timeline-progress-fill" style="width:${currentProgress}%; height:100%; background:var(--primary); transition: width 0.5s ease; border-radius:10px;"></div>
+                </div>
+                <div class="timeline" style="position:relative; z-index:2; display:flex; justify-content:space-between;">`;
+            
             timelines.forEach((step, idx) => {
                 let stateClass = '';
                 if (idx < currentIdx) stateClass = 'completed';
@@ -1179,12 +1189,14 @@ function updateStudentDashboard() {
                 if (step === 'Completed') icon = 'fa-flag-checkered';
 
                 timelineHtml += `
-                <div class="timeline-step ${stateClass}">
-                    <i class="fas ${icon}"></i>
-                    <div class="timeline-label">${step}</div>
+                <div class="timeline-step ${stateClass}" style="flex:1; text-align:center;">
+                    <div class="step-icon-circle" style="width:36px; height:36px; border-radius:50%; background:var(--bg-white); border:2px solid ${stateClass ? 'var(--primary)' : 'var(--border)'}; display:flex; align-items:center; justify-content:center; margin:0 auto 0.5rem; color:${stateClass ? 'var(--primary)' : 'var(--text-muted)'}; position:relative; background:white;">
+                        <i class="fas ${icon}" style="font-size:1rem;"></i>
+                    </div>
+                    <div class="timeline-label" style="font-size:0.75rem; font-weight:bold; color:${stateClass === 'active' ? 'var(--primary)' : 'var(--text-muted)'};">${step}</div>
                 </div>`;
             });
-            timelineHtml += `</div>`;
+            timelineHtml += `</div></div>`;
         }
 
         if (order.status === 'Placed' || order.status === 'Accepted' || order.status === 'Ready') {
@@ -1577,32 +1589,27 @@ function updateAdminPrintStatus(reqId, newStatus) {
         body: JSON.stringify(req)
     }).catch(e=>console.error(e));
 
-    // SYNC: Synchronize Parent Order status for Pure-Print requests to keep student's timeline in lockstep
+    // SYNC: Universal Parent Order Synchronization
     if (req.orderId) {
-        const orderIdSearch = req.orderId;
-        const parentOrder = (globalOrders || []).find(o => o.id === orderIdSearch);
+        const oId = req.orderId;
+        const parentOrder = (globalOrders || []).find(o => o.id === oId);
         
-        if (parentOrder) {
-            const items = parentOrder.items || [];
-            const isPurePrintOrder = items.length > 0 && items.every(item => item.isPrint || (item.name && item.name.toLowerCase().includes('print')));
+        if (parentOrder && parentOrder.status !== newStatus) {
+            // Aggressive Sync for print tasks linked to orders
+            console.log(`📡 FORCING TIMELINE SYNC: Order ${oId} -> ${newStatus}`);
+            parentOrder.status = newStatus;
             
-            // Only auto-sync if it's a pure-print order (multi-product orders require separate fulfillment)
-            if (isPurePrintOrder && parentOrder.status !== newStatus) {
-                console.log(`📡 Syncing Dashboard State: Order ${parentOrder.id} -> ${newStatus}`);
-                parentOrder.status = newStatus;
-                
-                const updatePayload = { status: newStatus };
-                if (newStatus === 'Completed') updatePayload.completionDate = new Date().toISOString();
+            const payload = { status: newStatus };
+            if (newStatus === 'Completed') payload.completionDate = new Date().toISOString();
 
-                fetch(`${API_URL}/api/orders/${parentOrder.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updatePayload)
-                }).then(() => {
-                    refreshOrdersDatabase();
-                    if (typeof updateStudentDashboard === 'function') updateStudentDashboard();
-                });
-            }
+            fetch(`${API_URL}/api/orders/${oId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(() => {
+                refreshOrdersDatabase();
+                if (typeof updateStudentDashboard === 'function') updateStudentDashboard();
+            }).catch(err => console.error("Sync Fetch Error:", err));
         }
     }
 
